@@ -37,7 +37,7 @@ impl CPU {
     }
 
     pub fn read(&self, addr: u32) -> u8 {
-        return 1
+        return 0
     }
 
     pub fn write(&mut self, addr: u32, value: u8) {
