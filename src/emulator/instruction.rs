@@ -44,12 +44,12 @@ impl Instruction {
     }
 
     pub fn decode(value: u32) -> Self {
-        // TODO Add tests?
+        println!(">> {}", value >> 30);
         Instruction {
             carry:               value >> 31 == 1,
-            less_than_zero:      value >> 30 == 1,
-            equal_to_zero:       value >> 29 == 1,
-            greater_than_zero:   value >> 28 == 1,
+            less_than_zero:      (value >> 30) & 1 == 1,
+            equal_to_zero:       (value >> 29) & 1 == 1,
+            greater_than_zero:   (value >> 28) & 1 == 1,
             opcode:              (value >> 22 & 0x3F) as u8,
             operands:            value >>  0 & 0x3FFFFF,
         }
