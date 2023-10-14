@@ -37,10 +37,19 @@ impl CPU {
     }
 
     pub fn read(&self, addr: u32) -> u8 {
-        return 0
+        match addr {
+            0 => 0,
+            1..=29 => self.general_purpose[(addr - 1) as usize],
+            30.. => 0
+        }
     }
 
     pub fn write(&mut self, addr: u32, value: u8) {
+        match addr {
+            0 => (),
+            1..=29 => self.general_purpose[(addr - 1) as usize] = value,
+            30.. => ()
+        };
         return ()
     }
 
@@ -86,12 +95,15 @@ mod tests {
             let mut values = [0;29];
             values.try_fill(&mut rng).unwrap();
             
-            for (address, value) in values.iter().zip(1..) {
-                cpu.write(*address, value);
+            for (value, address) in values.iter().zip(1..) {
+                cpu.write(address, *value);
             }
 
-            for (address, value) in values.iter().zip(1..) {
-                assert_eq!(value, cpu.read(*address));
+            for (value, address) in values.iter().zip(1..) {
+                assert_eq!(*value, cpu.read(address), 
+                        "Write/Read from ADDR: {} failed",
+                        address
+                        );
             }
 
         }
