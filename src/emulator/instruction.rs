@@ -9,7 +9,6 @@ pub struct Instruction {
     pub operands: u32
 }
 
-// TODO Move into own class and test
 impl Instruction {
     pub fn from_opcode(opcode: u8, operands: u32) -> Self {
        Instruction {
@@ -24,35 +23,30 @@ impl Instruction {
 
     #[allow(arithmetic_overflow)]
     pub fn encode(&self) -> u32 {
-    // TODO Add tests?
-    // TODO Add checks for oversized values
-    // TODO Must be a nicer way to do this....
+        // TODO move this earlier
         if self.opcode > 0x3F {
             panic!("opcode too large");
         };
-        // TODO move this earlier
         if self.operands > 0x1FFFFF {
             panic!("opcode too large");
         };
-        let num = (if self.carry             {(1 as u32) << 31} else{ 0 }) |
+        (if self.carry             {(1_u32) << 31} else{ 0 }) |
         (if self.less_than_zero    {1<< 30} else{ 0 }) as u32 |
         (if self.equal_to_zero     {1<< 29} else{ 0 }) as u32 |
         (if self.greater_than_zero {1<< 28} else{ 0 }) as u32 |
-        // TODO have way to make sure this doesn't overflow
         (self.opcode as u32)            << 22 |
-        self.operands;
-        return num;
+        self.operands
     }
 
     pub fn decode(value: u32) -> Self {
         println!(">> {}", value >> 30);
         Instruction {
-            carry:               value >> 31 == 1,
-            less_than_zero:      (value >> 30) & 1 == 1,
-            equal_to_zero:       (value >> 29) & 1 == 1,
-            greater_than_zero:   (value >> 28) & 1 == 1,
-            opcode:              (value >> 22 & 0x3F) as u8,
-            operands:            value >>  0 & 0x3FFFFF,
+            carry:             value >> 31 == 1,
+            less_than_zero:   (value >> 30) & 1 == 1,
+            equal_to_zero:    (value >> 29) & 1 == 1,
+            greater_than_zero:(value >> 28) & 1 == 1,
+            opcode:    (value >> 22 & 0x3F) as u8,
+            operands:   value       & 0x3FFFFF,
         }
     }
 
