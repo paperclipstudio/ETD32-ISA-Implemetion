@@ -56,6 +56,7 @@ impl CPU {
 mod tests {
     use super::*;
     use rand::Rng;
+    use rand::Fill;
 
     #[test]
     fn test_program_counter_inc() {
@@ -64,15 +65,36 @@ mod tests {
         cpu = cpu.clock();
         assert_eq!(pc + 1, cpu.program_counter)
     }
+
     /// any writes to this register have no effect and when read it always
     /// yields zero
     #[test]
     fn test_black_hole_register() {
         let mut cpu = CPU::new_blank();
+        let mut rng = rand::thread_rng();
         for _ in 0..1000 { 
-            let mut rng = rand::thread_rng();
             assert_eq!(cpu.read(0), 0);
             cpu.write(0, rng.gen());
         }
+    }
+
+    #[test]
+    fn test_general_register() {
+        let mut cpu = CPU::new_blank();
+        let mut rng = rand::thread_rng();
+        for _ in 0..100 { 
+            let mut values = [0;29];
+            values.try_fill(&mut rng).unwrap();
+            
+            for (address, value) in values.iter().zip(1..) {
+                cpu.write(*address, value);
+            }
+
+            for (address, value) in values.iter().zip(1..) {
+                assert_eq!(value, cpu.read(*address));
+            }
+
+        }
+
     }
 }   
