@@ -91,7 +91,30 @@ mod tests {
         let target = 0xF800_0ABC;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
+    }
 
+    #[test]
+    fn decode_flags() {
+        let mut instruction = Instruction::from_opcode(32, 0xABC);
+        instruction.carry = true;
+        let mut target = 0x8800_0ABC;
+        let mut result = Instruction::decode(target);
+        assert_eq!(instruction, result);
+
+        instruction.less_than_zero = true;
+        target = 0xC800_0ABC;
+        result = Instruction::decode(target);
+        assert_eq!(instruction, result);
+
+        instruction.equal_to_zero = true;
+        target = 0xE800_0ABC;
+        result = Instruction::decode(target);
+        assert_eq!(instruction, result);
+
+        instruction.greater_than_zero = true;
+        target = 0xF800_0ABC;
+        result = Instruction::decode(target);
+        assert_eq!(instruction, result);
     }
 
     #[test]
