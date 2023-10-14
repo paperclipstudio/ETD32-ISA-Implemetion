@@ -1,4 +1,18 @@
 #![allow(dead_code)]
+struct IntruptedCPU {
+    pub cpu: CPU
+}
+
+impl IntruptedCPU {
+    pub fn release(self) -> CPU {
+        self.cpu
+    }
+}
+
+enum UnknownCPU {
+    Intrupted(IntruptedCPU),
+    Unintrupted(CPU)
+}
 
 struct CPU {
     general_purpose: [u8;29],
@@ -8,6 +22,12 @@ struct CPU {
 }
 
 impl CPU {
+    fn function_map(opcode: u8) {
+       match opcode {
+            _ => todo!("Opcode {opcode} isn't implemented yet")
+       }
+    }
+
     /// Creates a new cpu with random values all values
     pub fn new() -> CPU {
         use rand::Fill;
@@ -22,8 +42,6 @@ impl CPU {
             .expect("Failed to create random values on CPU creation");
         cpu.flag_register.try_fill(&mut rng)
             .expect("Failed to create random values on CPU creation");
-
-
         return cpu
     }
     /// Creates a new zero'd cpu
@@ -54,9 +72,9 @@ impl CPU {
     }
 
     /// Simulates a rising edge on the clock 
-    pub fn clock(mut self) -> Self {
+    pub fn clock(mut self) -> UnknownCPU {
         self.program_counter += 1;
-        return self
+        return UnknownCPU::Unintrupted(self)
     }
 }
 
@@ -71,7 +89,10 @@ mod tests {
     fn test_program_counter_inc() {
         let mut cpu = CPU::new_blank();
         let pc = cpu.program_counter;
-        cpu = cpu.clock();
+        cpu = match cpu.clock() {
+            UnknownCPU::Intrupted(cpu) => panic!("Software interupt called"),
+            UnknownCPU::Unintrupted(cpu) => cpu,
+        };
         assert_eq!(pc + 1, cpu.program_counter)
     }
 
@@ -105,8 +126,12 @@ mod tests {
                         address
                         );
             }
-
         }
+    }
 
+    #[test]
+    fn test_software_interrupt() {
+        let mut cpu = CPU::new_blank();
+        let mut rng = rand::thread_rng();
     }
 }   
