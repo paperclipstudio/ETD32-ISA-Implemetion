@@ -23,7 +23,7 @@ struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
     program_counter: u8,
-    flag_register: [u8; 99]
+    flag_register: [u8; 4]
 }
 
 impl Cpu {
@@ -42,7 +42,7 @@ impl Cpu {
             general_purpose: [0;29],
             stack_pointer: 0,
             program_counter: 0,
-            flag_register: [0;99],
+            flag_register: [0;4],
         };
         cpu.general_purpose.try_fill(&mut rng)
             .expect("Failed to create random values on Cpu creation");
@@ -56,7 +56,7 @@ impl Cpu {
             general_purpose: [0;29],
             stack_pointer: 0,
             program_counter: 1,
-            flag_register: [0;99],
+            flag_register: [0;4],
         }
     }
 
@@ -79,15 +79,15 @@ impl Cpu {
 
     fn current_instruction(&self) -> Instruction {
         Instruction::decode (
-             self.read(self.program_counter * 4 - 3) as u32        |
-            (self.read(self.program_counter * 4 - 2) as u32) <<  8 |
-            (self.read(self.program_counter * 4 - 1) as u32) << 16 |
-            (self.read(self.program_counter * 4    ) as u32) << 24 )
+             self.read(self.program_counter    ) as u32        |
+            (self.read(self.program_counter + 1) as u32) <<  8 |
+            (self.read(self.program_counter + 2) as u32) << 16 |
+            (self.read(self.program_counter + 3) as u32) << 24 )
     }
 
     fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
-        self.write(location    , (instruction.encode() & 0xFF) as u8);
-        self.write(location + 1, ((instruction.encode() >> 8) & 0xFF) as u8);
+        self.write(location    , (instruction.encode()         & 0xFF) as u8);
+        self.write(location + 1, ((instruction.encode() >> 8)  & 0xFF) as u8);
         self.write(location + 2, ((instruction.encode() >> 16) & 0xFF) as u8);
         self.write(location + 3, ((instruction.encode() >> 24) & 0xFF) as u8);
     }
@@ -108,6 +108,7 @@ impl Cpu {
 
 struct InstSet {}
 impl InstSet {
+    /// Flow Control
     fn trigger_interupt(mut cpu: Cpu) -> UnknownCpu {
         cpu.program_counter += 1;
         UnknownCpu::Intrupted(IntruptedCpu{cpu})
@@ -132,8 +133,9 @@ mod tests {
     #[test]
     fn test_program_counter_inc() {
         let mut cpu = Cpu::new_blank();
+        cpu.program_counter = 1;
         // Load in jump + 1 commands
-        let jump_1 = Instruction::from_opcode(29, 1);
+        let jump_1 = Instruction::from_opcode(29, 4);
         cpu.load_instruction(1, &jump_1);
         cpu.load_instruction(5, &jump_1);
         cpu.load_instruction(9, &jump_1);
@@ -143,18 +145,21 @@ mod tests {
             UnknownCpu::Intrupted(_) => panic!("Software interupt called"),
             UnknownCpu::Unintrupted(cpu) => cpu,
         };
-        assert_eq!(pc + 1, cpu.program_counter);
-        cpu = match cpu.clock() {
-            UnknownCpu::Intrupted(_) => panic!("Software interupt called"),
-            UnknownCpu::Unintrupted(cpu) => cpu,
-        };
-        assert_eq!(pc + 2, cpu.program_counter);
+        assert_eq!(pc + 4, cpu.program_counter);
+        println!("SEOND, {:?}", cpu.current_instruction());
 
         cpu = match cpu.clock() {
             UnknownCpu::Intrupted(_) => panic!("Software interupt called"),
             UnknownCpu::Unintrupted(cpu) => cpu,
         };
-        assert_eq!(pc + 3, cpu.program_counter);
+        assert_eq!(pc + 8, cpu.program_counter);
+        println!("Third, {:?}", cpu.current_instruction());
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(_) => panic!("Software interupt called"),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(pc + 12, cpu.program_counter);
     }
 
     /// any writes to this register have no effect and when read it always
@@ -197,7 +202,7 @@ mod tests {
         let throw_interupt = Instruction::from_opcode(32, 0);
         cpu.load_instruction(1, &throw_interupt);
         match cpu.clock() {
-            UnknownCpu::Intrupted(cpu) => (),
+            UnknownCpu::Intrupted(_) => (),
             UnknownCpu::Unintrupted(cpu) => panic!("Cpu should be in interupted state {}", cpu.show())
         }
     }
