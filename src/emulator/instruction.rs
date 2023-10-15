@@ -50,6 +50,54 @@ impl Instruction {
         }
     }
 
+    pub fn r_dest(&self) -> u8 {
+        (self.operands >> 17) as u8        
+    }
+
+    pub fn r_target(&self) -> u8 {
+        self.r_dest()
+    }
+
+    pub fn r_x(&self) -> u8 {
+        ((self.operands >> 12) & 0x1F) as u8        
+    }
+
+    pub fn r_base(&self) -> u8 {
+        self.r_x()
+    }
+
+    pub fn r_y(&self) -> u8 {
+        ((self.operands >> 7) & 0x1F) as u8        
+    }
+
+    pub fn r_index(&self) -> u8 {
+        self.r_y()
+    }
+
+    pub fn i_y(&self) -> i16 {
+        if self.operands & 0x800 != 0 {
+            0 - (self.operands & 0x7FF) as i16
+        } else {
+            (self.operands & 0x7FF) as i16        
+        }
+    }
+
+    pub fn i_offset(&self) -> u32 {
+        (self.operands & 0xFFF) as u32
+    }
+
+    pub fn i(&self) -> i32 {
+        if self.operands & 0x200000 == 0 {
+            (self.operands & 0x1FFFFF) as i32
+        } else {
+            println!("{}:{}", i32::MIN, (self.operands & 0x1FFFFF) as i32);
+            0_i32 - ((self.operands & 0x1FFFFF) as i32)
+        }
+    
+
+    }
+
+
 }
 
 #[cfg(test)]
@@ -126,7 +174,7 @@ mod tests {
         assert_eq!(i.r_dest(), 0b11011);
         assert_eq!(i.r_x(), 0b10101);
         assert_eq!(i.r_y(), 0b00000);
-        assert_eq!(i.i_y(), 0b00000);
+        assert_eq!(i.i_y(), 0b00000_1111111);
         assert_eq!(i.r_target(), 0b11011);
         assert_eq!(i.r_base(),   0b10101);
         assert_eq!(i.i_offset(), 127);
@@ -140,11 +188,11 @@ mod tests {
         let i = Instruction::from_opcode(0, 0b00100_01010_11111_0000000);
         assert_eq!(i.r_dest(), 0b00100);
         assert_eq!(i.r_x(), 0b01010);
-        assert_eq!(i.r_y(), -15);
-        assert_eq!(i.i_y(), 31);
+        assert_eq!(i.r_y(), 31);
+        assert_eq!(i.i_y(), -1920);
         assert_eq!(i.r_target(), 0b00100);
         assert_eq!(i.r_base(),   0b01010);
-        assert_eq!(i.i_offset(), 7600);
+        assert_eq!(i.i_offset(), 3968);
         assert_eq!(i.r_index(), 0b11111);
         assert_eq!(i.i(), 569216);
     }
