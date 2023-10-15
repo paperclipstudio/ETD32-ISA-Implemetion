@@ -119,5 +119,34 @@ mod tests {
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
     }
+
+    #[test]
+    fn operand_encoding_rd() {
+        let i = Instruction::from_opcode(0, 0b11011_10101_00000_1111111);
+        assert_eq!(i.r_dest(), 0b11011);
+        assert_eq!(i.r_x(), 0b10101);
+        assert_eq!(i.r_y(), 0b00000);
+        assert_eq!(i.i_y(), 0b00000);
+        assert_eq!(i.r_target(), 0b11011);
+        assert_eq!(i.r_base(),   0b10101);
+        assert_eq!(i.i_offset(), 127);
+        assert_eq!(i.r_index(), 0b00000);
+        assert_eq!(i.i(), -1527935);
+    }
+
+
+    #[test]
+    fn operand_encoding_negitive() {
+        let i = Instruction::from_opcode(0, 0b00100_01010_11111_0000000);
+        assert_eq!(i.r_dest(), 0b00100);
+        assert_eq!(i.r_x(), 0b01010);
+        assert_eq!(i.r_y(), -15);
+        assert_eq!(i.i_y(), 31);
+        assert_eq!(i.r_target(), 0b00100);
+        assert_eq!(i.r_base(),   0b01010);
+        assert_eq!(i.i_offset(), 7600);
+        assert_eq!(i.r_index(), 0b11111);
+        assert_eq!(i.i(), 569216);
+    }
 }
 
