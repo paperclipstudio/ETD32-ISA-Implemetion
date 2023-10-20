@@ -12,7 +12,6 @@ impl IntruptedCpu {
     }
 }
 
-
 enum UnknownCpu {
     Intrupted(IntruptedCpu),
     Unintrupted(Cpu)
@@ -27,12 +26,10 @@ struct Cpu {
 }
 
 impl Cpu {
-
     fn show(&self) -> String {
         let result = format!("GR: {:?}", self.general_purpose);
         result
     }
-
 
     /// Creates a new cpu with random values all values
     pub fn new() -> Cpu {
@@ -218,5 +215,41 @@ mod tests {
         cpu.program_counter = 1;
         assert_eq!(jump_1, cpu.current_instruction());
 
+    }
+
+    #[test]
+    fn test_jump_instruction() {
+        let mut cpu = Cpu::new_blank();
+        // Fill with Intrupts
+        for i in 0..15 {
+            let intrupt = Instruction::from_opcode(32, 21);
+            cpu.load_instruction(i * 4 + 1, &intrupt);
+        }
+        let jump_to_1 = Instruction::from_opcode(31,  1);
+        let jump_to_21 = Instruction::from_opcode(31, 21);
+        let jump_to_37 = Instruction::from_opcode(31, 37);
+
+        cpu.load_instruction( 1, &jump_to_37);
+        cpu.load_instruction(37, &jump_to_21);
+        cpu.load_instruction(21, &jump_to_1);
+
+        cpu.program_counter = 1;
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected intrupt {:?}", cpu.release()),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(37, cpu.program_counter);
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected intrupt {:?}", cpu.release()),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(21, cpu.program_counter);
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected intrupt {:?}", cpu.release()),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(1, cpu.program_counter);
     }
 }   
