@@ -9,6 +9,34 @@ pub struct Instruction {
     pub operands: u32
 }
 
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Flags
+
+        write!(fmt, "|{}", if self.carry {"C"} else {"-"}).ok();
+        write!(fmt, "{}", if self.less_than_zero {"N"} else {"-"}).ok();
+        write!(fmt, "{}", if self.equal_to_zero {"Z"} else {"-"}).ok();
+        write!(fmt, "{}", if self.greater_than_zero {"P"} else {"-"}).ok();
+
+        // Opcode
+        let opcode: String = format!("{}", self.opcode);
+        write!(fmt, "|{:9}|", match self.opcode {
+            
+            29 => "Jump offset",
+            30 => "Jump to",
+            31 => "Jump to",
+            32 => "Interupt",
+            _ => opcode.as_str()
+        }).ok();
+
+        // Operands
+        write!(fmt, "{:9}|", self.operands).ok();
+
+        Ok(())
+    }
+
+}
+
 impl Instruction {
     pub fn from_opcode(opcode: u8, operands: u32) -> Self {
        Instruction {

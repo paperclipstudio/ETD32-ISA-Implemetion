@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 mod instruction;
 use instruction::Instruction;
+use std::fmt;
 
 struct IntruptedCpu {
     pub cpu: Cpu
@@ -17,12 +18,43 @@ enum UnknownCpu {
     Unintrupted(Cpu)
 }
 
+impl UnknownCpu {
+    fn unwrap(self) -> Cpu {
+        match self {
+            UnknownCpu::Intrupted(cpu) => cpu.release(),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
     program_counter: u8,
     flag_register: [u8; 4]
+}
+
+impl fmt::Display for Cpu {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "General {:#?} \n", self.general_purpose).ok();
+        write!(fmt, "StackPointer {:#?} \n", self.stack_pointer).ok();
+        write!(fmt, "Program Counter {:#?} \n", self.program_counter).ok();
+        write!(fmt, "Flag Register {:#?} \n", self.flag_register).ok();
+
+        let mut i = 1;
+        while i < self.general_purpose.len() as u8 {
+            if i == self.program_counter {
+                write!(fmt, ">>>").ok();
+            } else {
+                write!(fmt, "   ").ok();
+            }
+            write!(fmt, "{} \n", self.instruction_at(i)).ok();
+            i += 4
+        }
+
+        return Ok(())
+    }
 }
 
 impl Cpu {
@@ -73,13 +105,16 @@ impl Cpu {
         };
     }
 
+    pub fn current_instruction(&self) -> Instruction {
+        self.instruction_at(self.program_counter)
+    }
 
-    fn current_instruction(&self) -> Instruction {
+    fn instruction_at(&self, i:u8) -> Instruction {
         Instruction::decode (
-             self.read(self.program_counter    ) as u32        |
-            (self.read(self.program_counter + 1) as u32) <<  8 |
-            (self.read(self.program_counter + 2) as u32) << 16 |
-            (self.read(self.program_counter + 3) as u32) << 24 )
+             self.read(i    ) as u32        |
+            (self.read(i + 1) as u32) <<  8 |
+            (self.read(i + 2) as u32) << 16 |
+            (self.read(i + 3) as u32) << 24 )
     }
 
     fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
@@ -95,6 +130,7 @@ impl Cpu {
         print!(">> Inst: {:#?}", instruction);
         match instruction.opcode {
             29 => InstSet::jump_offset(self),
+            31 => InstSet::jump_to(self),
             32 => InstSet::trigger_interupt(self),
             opcode => panic!("Instruction {opcode} not implemented yet\nInstruction {:#?}\n cpu: {:#?}",instruction, self.show())
         }
@@ -113,11 +149,20 @@ impl InstSet {
 
     fn jump_offset(mut cpu: Cpu) -> UnknownCpu {
         // TODO what happens when jump is too large UB?
-        println!("jumping {} steps", cpu.current_instruction().operands);
         cpu.program_counter += cpu
             .current_instruction()
             .operands as u8;
         UnknownCpu::Unintrupted(cpu)
+    }
+
+    fn jump_to(mut cpu: Cpu) -> UnknownCpu {
+        let jump_to = cpu.current_instruction().i();
+        if jump_to < 0 || jump_to > 29 - 4 {
+            UnknownCpu::Intrupted(IntruptedCpu{cpu})
+        } else {
+            cpu.program_counter = jump_to as u8;
+            UnknownCpu::Unintrupted(cpu)
+        }
     }
 }
 
@@ -227,27 +272,27 @@ mod tests {
         }
         let jump_to_1 = Instruction::from_opcode(31,  1);
         let jump_to_21 = Instruction::from_opcode(31, 21);
-        let jump_to_37 = Instruction::from_opcode(31, 37);
+        let jump_to_9 = Instruction::from_opcode(31, 9);
 
-        cpu.load_instruction( 1, &jump_to_37);
-        cpu.load_instruction(37, &jump_to_21);
+        cpu.load_instruction( 1, &jump_to_9);
+        cpu.load_instruction(9, &jump_to_21);
         cpu.load_instruction(21, &jump_to_1);
 
         cpu.program_counter = 1;
         cpu = match cpu.clock() {
-            UnknownCpu::Intrupted(cpu) => panic!("Unepected intrupt {:?}", cpu.release()),
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected interupt {}", cpu.release()),
             UnknownCpu::Unintrupted(cpu) => cpu,
         };
-        assert_eq!(37, cpu.program_counter);
+        assert_eq!(9, cpu.program_counter);
 
         cpu = match cpu.clock() {
-            UnknownCpu::Intrupted(cpu) => panic!("Unepected intrupt {:?}", cpu.release()),
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected interupt {}", cpu.release()),
             UnknownCpu::Unintrupted(cpu) => cpu,
         };
         assert_eq!(21, cpu.program_counter);
 
         cpu = match cpu.clock() {
-            UnknownCpu::Intrupted(cpu) => panic!("Unepected intrupt {:?}", cpu.release()),
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected interupt {}", cpu.release()),
             UnknownCpu::Unintrupted(cpu) => cpu,
         };
         assert_eq!(1, cpu.program_counter);
