@@ -2,6 +2,44 @@
 mod instruction;
 use instruction::Instruction;
 use std::fmt;
+use rand;
+use rand::Rng;
+
+const MEMORY_SIZE: usize = 255;
+
+#[derive(Debug)]
+struct Memory {
+    pub data: [u8; MEMORY_SIZE]
+}
+
+impl Memory {
+    fn new_blank() -> Self {
+        Memory {
+            data: [0;MEMORY_SIZE]
+        }
+    }
+
+    fn new() -> Self {
+        let mut rng = rand::thread_rng();
+        Memory {
+            data: [rng.gen(); MEMORY_SIZE]
+        }
+    }
+    fn read(address: &u8) -> Option<u8> {
+        Some(0)
+    }
+
+    pub fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str> {
+        Err("Not impl")
+    }
+}
+
+impl fmt::Display for Memory {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
+    }
+
+}
 
 struct InterruptedCpu {
     pub cpu: Cpu
@@ -32,7 +70,8 @@ struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
     program_counter: u8,
-    flag_register: [u8; 4]
+    flag_register: [u8; 4],
+    memory: Memory,
 }
 
 impl fmt::Display for Cpu {
@@ -79,6 +118,7 @@ impl Cpu {
             stack_pointer: 0,
             program_counter: 0,
             flag_register: [0;4],
+            memory: Memory::new()
         };
         cpu.general_purpose.try_fill(&mut rng)
             .expect("Failed to create random values on Cpu creation");
@@ -93,6 +133,7 @@ impl Cpu {
             stack_pointer: 0,
             program_counter: 1,
             flag_register: [0;4],
+            memory: Memory::new_blank(),
         }
     }
 
@@ -367,5 +408,26 @@ mod tests {
             UnknownCpu::Ininterrupted(cpu) => cpu,
         };
         assert_eq!(1, cpu.program_counter);
+    }
+
+    #[test]
+    fn test_memory_setting() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for _ in 0..100 { 
+            let mut values = [0;MEMORY_SIZE];
+            values.try_fill(&mut rng).unwrap();
+            
+            for (value, address) in values.iter().zip(0..) {
+                cpu.memory.write(address, *value).ok();
+            }
+
+            for (value, address) in values.iter().zip(0..) {
+                assert_eq!(*value, cpu.read(address), 
+                        "Write/Read from ADDR: {} failed",
+                        address
+                        );
+            }
+        }
     }
 }   
