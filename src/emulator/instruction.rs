@@ -21,6 +21,7 @@ impl std::fmt::Display for Instruction {
         // Opcode
         let opcode: String = format!("{}", self.opcode);
         write!(fmt, "|{:15}|", match self.opcode {
+            17 => "Load from Mem BO",
             29 => "Jump offset",
             30 => "Jump to Rd",
             31 => "Jump to I",
@@ -33,7 +34,8 @@ impl std::fmt::Display for Instruction {
             // Logic Rd
             (0..=16, false) => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
             (0..=16, true) => write!(fmt, "Logic RI").ok(),
-            (17..=28, _) => write!(fmt, "Memory").ok(),
+            (17..=28, false) => write!(fmt, "{:4}:{:4}:{:9}|", self.r_target(), self.r_base(), self.i_offset()).ok(),
+            (17..=28, true) => write!(fmt, "Memory").ok(),
             (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
             (30, _) => write!(fmt, "{:16}|", self.r_dest()).ok(),
             (_, _) => write!(fmt, "???").ok(), //panic!("Opcode is too large")
@@ -105,12 +107,26 @@ impl Instruction {
         self.r_dest()
     }
 
+    pub fn r_target_set(&mut self, value: u8) {
+        self.r_dest_set(value)
+    }
+
     pub fn r_x(&self) -> u8 {
         ((self.operands >> 12) & 0x1F) as u8        
     }
 
+    pub fn r_x_set(&mut self, value: u8) {
+        //TODO add tests
+        self.operands &= (!(0x1F << 12)) as u32;
+        self.operands |= ((0xFFF & value as u32) << 12) as u32;
+    }
+
     pub fn r_base(&self) -> u8 {
         self.r_x()
+    }
+
+    pub fn r_base_set(&mut self, value:u8) {
+        self.r_x_set(value)
     }
 
     pub fn r_y(&self) -> u8 {
@@ -131,6 +147,12 @@ impl Instruction {
 
     pub fn i_offset(&self) -> u32 {
         (self.operands & 0xFFF) as u32
+    }
+
+    pub fn i_offset_set(&mut self, value: u32) {
+        //TODO add tests
+        self.operands &= !0xFFF as u32;
+        self.operands |= 0xFFF & value;
     }
 
     pub fn i(&self) -> i32 {
