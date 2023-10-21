@@ -1,5 +1,5 @@
-use rand;
 use rand::Rng;
+
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
     pub carry: bool,
@@ -33,13 +33,13 @@ impl std::fmt::Display for Instruction {
         // Operands
         match (self.opcode, self.opcode % 2 == 0) {
             // Logic Rd
-            (0..=16, false) => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
-            (0..=16, true) => write!(fmt, "Logic RI           |").ok(),
-            (17..=28, false) => write!(fmt, "{:4}:{:4}:{:9}|", self.r_target(), self.r_base(), self.i_offset()).ok(),
-            (17..=28, true) => write!(fmt,  "Memory             |").ok(),
+            (0..=16, false)             => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
+            (0..=16, true)              => write!(fmt, "Logic RI           |").ok(),
+            (17..=28, false)            => write!(fmt, "{:4}:{:4}:{:9}|", self.r_target(), self.r_base(), self.i_offset()).ok(),
+            (17..=28, true)             => write!(fmt, "Memory             |").ok(),
             (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
-            (30, _) => write!(fmt, "{:16}|", self.r_dest()).ok(),
-            (_, _) => write!(fmt, "???").ok(), //panic!("Opcode is too large")
+            (30, _)                     => write!(fmt, "{:16}|", self.r_dest()).ok(),
+            (33..=u8::MAX, _) => panic!("Opcode is too large")
         };
 
 
@@ -118,7 +118,7 @@ impl Instruction {
     pub fn r_x_set(&mut self, value: u8) {
         //TODO add tests
         self.operands &= (!(0x1F << 12)) as u32;
-        self.operands |= ((0x1F & value as u32) << 12) as u32;
+        self.operands |= (0x1F & value as u32) << 12;
     }
 
     pub fn r_base(&self) -> u8 {
@@ -146,7 +146,7 @@ impl Instruction {
     }
 
     pub fn i_offset(&self) -> u32 {
-        (self.operands & 0xFFF) as u32
+        self.operands & 0xFFF
     }
 
     pub fn i_offset_set(&mut self, value: u32) {
@@ -154,7 +154,7 @@ impl Instruction {
             panic!("value is too large")
         }
         //TODO add tests
-        self.operands &= !0xFFF as u32;
+        self.operands &= !0xFFF;
         self.operands |= 0xFFF & value;
     }
 

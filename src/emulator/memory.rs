@@ -32,7 +32,7 @@ impl SimpleMemory {
 
 impl Memory for SimpleMemory {
     fn read(&self, address: u8) -> Option<u8> {
-        return if address < self.data.len() as u8 {
+        if address < self.data.len() as u8 {
             Some(self.data[address as usize])
         } else {
            None 
@@ -40,7 +40,7 @@ impl Memory for SimpleMemory {
     }
 
     fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str> {
-        return if address >= self.data.len() as u8 {
+        if address >= self.data.len() as u8 {
             Err("Address out of memory")
         } else {
             self.data[address as usize] = value;
@@ -51,8 +51,8 @@ impl Memory for SimpleMemory {
 
 impl fmt::Display for dyn Memory {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "|---|-----------------------|\n").ok();
-        write!(fmt, "|   | 0| 1| 2| 3| 4| 5| 6| 7|\n").ok();
+        writeln!(fmt, "|---|-----------------------|").ok();
+        writeln!(fmt, "|   | 0| 1| 2| 3| 4| 5| 6| 7|").ok();
         write!(fmt, "|---|-----------------------|").ok();
         for i  in 0..MEMORY_SIZE {
             if i % 8 == 0 {
