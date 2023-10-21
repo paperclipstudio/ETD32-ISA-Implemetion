@@ -39,7 +39,7 @@ impl std::fmt::Display for Instruction {
             (17..=28, true)             => write!(fmt, "Memory             |").ok(),
             (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
             (30, _)                     => write!(fmt, "{:16}|", self.r_dest()).ok(),
-            (33..=u8::MAX, _) => panic!("Opcode is too large")
+            (33..=u8::MAX, _)           => write!(fmt, "{:16}|", self.opcode).ok(),
         };
 
 

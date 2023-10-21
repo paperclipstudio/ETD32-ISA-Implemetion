@@ -483,4 +483,41 @@ mod tests {
             }
         }
     }
+
+
+    #[test]
+    fn test_ld16_bo_base() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for _ in 0..10 { 
+            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            for i in 0..values.len() {
+                values[i] = i as u8
+            }
+            values.try_fill(&mut rng).unwrap();
+            for (value, address) in values.iter().zip(0..) {
+                cpu.memory.write(address, *value).ok();
+                //println!("Wrote {} to  {}", value, address);
+                //println!("data {}", cpu.memory);
+            }
+            for address in 4..31 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(18, 0);
+                instruction.r_target_set(1);
+                instruction.r_base_set(address);
+                instruction.i_offset_set(0);
+                cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
+                println!("|>|>{}\n", instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Ok(cpu) => cpu,
+                    UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+
+                let value = cpu.read(1) << 4 | cpu.read(2);
+                let expected = values[address as usize] << 4 | values[address as usize + 1];
+                assert_eq!(expected, value, "{}", instruction);
+            }
+        }
+    }
 }   
