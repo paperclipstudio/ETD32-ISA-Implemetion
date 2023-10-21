@@ -53,6 +53,13 @@ impl fmt::Display for Cpu {
             i += 4
         }
 
+        for i in 0..32 {
+            if i % 4 == 1 {
+                write!(fmt, "\n|{:3}|", i).ok();
+            };
+            write!(fmt, "{:X},", self.read(i)).ok();
+        }
+
         return Ok(())
     }
 }
@@ -127,12 +134,13 @@ impl Cpu {
     /// Simulates a rising edge on the clock 
     pub fn clock(self) -> UnknownCpu {
         let instruction = self.current_instruction();
-        print!(">> Inst: {:#?}", instruction);
+        print!(">> Inst: {}\n", instruction);
         match instruction.opcode {
             29 => InstSet::jump_offset(self),
-            31 => InstSet::jump_to(self),
+            30 => InstSet::jump_to_rd(self),
+            31 => InstSet::jump_to_i(self),
             32 => InstSet::trigger_interupt(self),
-            opcode => panic!("Instruction {opcode} not implemented yet\nInstruction {:#?}\n cpu: {:#?}",instruction, self.show())
+            opcode => panic!("Instruction {opcode} not implemented yet\nInstruction {}\n cpu: {}",instruction, self.show())
         }
         //return UnknownCpu::Unintrupted(self)
     }
@@ -155,7 +163,17 @@ impl InstSet {
         UnknownCpu::Unintrupted(cpu)
     }
 
-    fn jump_to(mut cpu: Cpu) -> UnknownCpu {
+    fn jump_to_rd(mut cpu: Cpu) -> UnknownCpu {
+        let jump_to = cpu.read(cpu.current_instruction().r_dest());
+        if jump_to > 29 - 4 {
+            UnknownCpu::Intrupted(IntruptedCpu{cpu})
+        } else {
+            cpu.program_counter = jump_to as u8;
+            UnknownCpu::Unintrupted(cpu)
+        }
+    }
+
+    fn jump_to_i(mut cpu: Cpu) -> UnknownCpu {
         let jump_to = cpu.current_instruction().i();
         if jump_to < 0 || jump_to > 29 - 4 {
             UnknownCpu::Intrupted(IntruptedCpu{cpu})
@@ -262,8 +280,10 @@ mod tests {
 
     }
 
+    //TODO Add test for out of bounds jumps
+
     #[test]
-    fn test_jump_instruction() {
+    fn test_jump_i_instruction() {
         let mut cpu = Cpu::new_blank();
         // Fill with Intrupts
         for i in 0..15 {
@@ -277,6 +297,57 @@ mod tests {
         cpu.load_instruction( 1, &jump_to_9);
         cpu.load_instruction(9, &jump_to_21);
         cpu.load_instruction(21, &jump_to_1);
+
+        cpu.program_counter = 1;
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected interupt {}", cpu.release()),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(9, cpu.program_counter);
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected interupt {}", cpu.release()),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(21, cpu.program_counter);
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Intrupted(cpu) => panic!("Unepected interupt {}", cpu.release()),
+            UnknownCpu::Unintrupted(cpu) => cpu,
+        };
+        assert_eq!(1, cpu.program_counter);
+    }
+
+    #[test]
+    fn test_jump_rd_instruction() {
+        let mut cpu = Cpu::new_blank();
+        // Fill with Intrupts
+        for i in 0..15 {
+            let intrupt = Instruction::from_opcode(32, 21);
+            cpu.load_instruction(i * 4 + 1, &intrupt);
+        }
+
+        let mut jump_to_1 = Instruction::from_opcode(30,  0);
+        let mut jump_to_21 = Instruction::from_opcode(30, 0);
+        let mut jump_to_9 = Instruction::from_opcode(30, 0);
+        println!("Set 1");
+        // We will jump to the value in register 10
+        jump_to_1.r_dest_set(6);
+        // We set the value of register 10 to 1
+        cpu.write(6, 1);
+        // So this instruction will just to instruction 1
+        println!("Set 21");
+        jump_to_21.r_dest_set(7);
+        cpu.write(7, 21);
+        println!("Set 9");
+        jump_to_9.r_dest_set(8);
+        cpu.write(8, 9);
+
+        cpu.load_instruction(1, &jump_to_9);
+        cpu.load_instruction(9, &jump_to_21);
+        cpu.load_instruction(21, &jump_to_1);
+
+        println!("{cpu}");
 
         cpu.program_counter = 1;
         cpu = match cpu.clock() {

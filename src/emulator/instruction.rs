@@ -20,17 +20,27 @@ impl std::fmt::Display for Instruction {
 
         // Opcode
         let opcode: String = format!("{}", self.opcode);
-        write!(fmt, "|{:9}|", match self.opcode {
-            
+        write!(fmt, "|{:15}|", match self.opcode {
             29 => "Jump offset",
-            30 => "Jump to",
-            31 => "Jump to",
+            30 => "Jump to Rd",
+            31 => "Jump to I",
             32 => "Interupt",
             _ => opcode.as_str()
         }).ok();
 
         // Operands
-        write!(fmt, "{:9}|", self.operands).ok();
+        match (self.opcode, self.opcode % 2 == 0) {
+            // Logic Rd
+            (0..=16, false) => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
+            (0..=16, true) => write!(fmt, "Logic RI").ok(),
+            (17..=28, _) => write!(fmt, "Memory").ok(),
+            (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
+            (30, _) => write!(fmt, "{:16}|", self.r_dest()).ok(),
+            (_, _) => write!(fmt, "???").ok(), //panic!("Opcode is too large")
+        };
+
+
+  //      write!(fmt, "{:9}|", self.operands).ok();
 
         Ok(())
     }
@@ -55,8 +65,8 @@ impl Instruction {
         if self.opcode > 0x3F {
             panic!("opcode too large");
         };
-        if self.operands > 0x1FFFFF {
-            panic!("opcode too large");
+        if self.operands > 0x3FFFFF {
+            panic!("operands too large {:X}", self.operands);
         };
         (if self.carry             {(1_u32) << 31} else{ 0 }) |
         (if self.less_than_zero    {1<< 30} else{ 0 }) as u32 |
@@ -80,6 +90,15 @@ impl Instruction {
 
     pub fn r_dest(&self) -> u8 {
         (self.operands >> 17) as u8        
+    }
+
+    pub fn r_dest_set(&mut self, value:u8) {
+        // TODO add tests
+        if value > 0x1F {
+            panic!("Value too large")
+        }
+        self.operands &= !(0x1F << 16);
+        self.operands |= (value as u32) << 17;
     }
 
     pub fn r_target(&self) -> u8 {
@@ -121,10 +140,7 @@ impl Instruction {
             println!("{}:{}", i32::MIN, (self.operands & 0x1FFFFF) as i32);
             0_i32 - ((self.operands & 0x1FFFFF) as i32)
         }
-    
-
     }
-
 
 }
 
