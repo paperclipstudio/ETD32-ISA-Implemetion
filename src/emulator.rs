@@ -1,75 +1,12 @@
 #![allow(dead_code)]
 mod instruction;
+mod memory;
 use instruction::Instruction;
 use std::fmt;
 use rand;
 use rand::Rng;
+use memory::*;
 
-const MEMORY_SIZE: u8 = 255;
-// const MEMORY_SIZE: usize = 10;
-
-#[derive(Debug)]
-struct SimpleMemory {
-    data: [u8; MEMORY_SIZE as usize]
-}
-
-trait Memory {
-    fn read(&self, address: u8) -> Option<u8>;
-    fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str>;
-}
-
-impl SimpleMemory {
-    fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        SimpleMemory {
-            data: [rng.gen(); MEMORY_SIZE as usize]
-        }
-    }
-
-    fn new_blank() -> Self {
-        SimpleMemory {
-            data: [0;MEMORY_SIZE as usize]
-        }
-    }
-}
-
-impl Memory for SimpleMemory {
-    fn read(&self, address: u8) -> Option<u8> {
-        return if address < self.data.len() as u8 {
-            Some(self.data[address as usize])
-        } else {
-           None 
-        }
-    }
-
-    fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str> {
-        return if address >= self.data.len() as u8 {
-            Err("Address out of memory")
-        } else {
-            self.data[address as usize] = value;
-            Ok(())
-        }
-    }
-}
-
-impl fmt::Display for dyn Memory {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "|---|-----------------------|\n").ok();
-        write!(fmt, "|   | 0| 1| 2| 3| 4| 5| 6| 7|\n").ok();
-        write!(fmt, "|---|-----------------------|").ok();
-        for i  in 0..MEMORY_SIZE {
-            if i % 8 == 0 {
-                write!(fmt, "\n|{:3}|", i).ok();
-            }
-            match self.read(i) {
-                Some(v) => write!(fmt, "{:2X}|", v),
-                None =>  write!(fmt, "XX|"),
-            }.ok();
-        }
-        Ok(())
-    }
-
-}
 
 struct InterruptedCpu {
     pub cpu: Cpu
@@ -513,7 +450,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn test_ld8_bo_offset() {
