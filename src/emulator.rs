@@ -6,10 +6,11 @@ use rand;
 use rand::Rng;
 
 const MEMORY_SIZE: usize = 255;
+// const MEMORY_SIZE: usize = 10;
 
 #[derive(Debug)]
 struct Memory {
-    pub data: [u8; MEMORY_SIZE]
+    data: [u8; MEMORY_SIZE]
 }
 
 impl Memory {
@@ -25,17 +26,37 @@ impl Memory {
             data: [rng.gen(); MEMORY_SIZE]
         }
     }
-    fn read(address: &u8) -> Option<u8> {
-        Some(0)
+
+    fn read(&self, address: u8) -> Option<u8> {
+        return if address < self.data.len() as u8 {
+            Some(self.data[address as usize])
+        } else {
+           None 
+        }
     }
 
     pub fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str> {
-        Err("Not impl")
+        return if address >= self.data.len() as u8 {
+            Err("Address out of memory")
+        } else {
+            self.data[address as usize] = value;
+            println!(">>>data {:?}", self.data);
+            Ok(())
+        }
     }
 }
 
 impl fmt::Display for Memory {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "|---|-----------------------|\n").ok();
+        write!(fmt, "|   | 0| 1| 2| 3| 4| 5| 6| 7|\n").ok();
+        write!(fmt, "|---|-----------------------|").ok();
+        for i  in 0..MEMORY_SIZE {
+            if i % 8 == 0 {
+                write!(fmt, "\n|{:3}|", i).ok();
+            }
+            write!(fmt, "{:2X}|", self.data[i]).ok();
+        }
         Ok(())
     }
 
@@ -414,18 +435,22 @@ mod tests {
     fn test_memory_setting() {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
-        for _ in 0..100 { 
+        for i in 0..3 { 
             let mut values = [0;MEMORY_SIZE];
             values.try_fill(&mut rng).unwrap();
             
             for (value, address) in values.iter().zip(0..) {
-                cpu.memory.write(address, *value).ok();
+                println!("{:?}", cpu.memory.write(address, *value));
+                println!("Wrote {} to  {}", value, address);
+                println!("data {:?}", cpu.memory.data);
             }
-
+            println!("MEME\n{}", cpu.memory);
             for (value, address) in values.iter().zip(0..) {
-                assert_eq!(*value, cpu.read(address), 
-                        "Write/Read from ADDR: {} failed",
-                        address
+                assert_eq!(Some(*value), cpu.memory.read(address), 
+                        "Write/Read num {} from ADDR: {} failed\n\n{:?}",
+                        i,
+                        address,
+                        cpu.memory.data
                         );
             }
         }
