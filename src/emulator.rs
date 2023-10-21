@@ -206,6 +206,7 @@ impl Cpu {
         let instruction = self.current_instruction();
         print!(">> Inst: {}\n", instruction);
         match instruction.opcode {
+            17 => InstSet::load_8_bo(self),
             29 => InstSet::jump_offset(self),
             30 => InstSet::jump_to_rd(self),
             31 => InstSet::jump_to_i(self),
@@ -219,6 +220,22 @@ impl Cpu {
 
 struct InstSet {}
 impl InstSet {
+    ///Memory
+    fn load_8_bo(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let memory_address = instruction.r_base() + instruction.i_offset() as u8;
+        let value = match cpu.memory.read(memory_address) {
+            Some(value) => value,
+            None => return UnknownCpu::Interrupted(InterruptedCpu{cpu})
+        };
+        println!("Base {}, Offset {}", instruction.r_base(), instruction.i_offset());
+        println!("M{}", memory_address);
+        println!("{}", cpu.memory);
+        println!("V{}", value);
+        cpu.write(instruction.r_dest(), value);
+        UnknownCpu::Uninterrupted(cpu)
+    }
+
     /// Flow Control
     fn trigger_interupt(mut cpu: Cpu) -> UnknownCpu {
         cpu.program_counter += 1;
@@ -229,7 +246,7 @@ impl InstSet {
         // TODO what happens when jump is too large UB?
         cpu.program_counter += cpu
             .current_instruction()
-            .operands as u8;
+            .i() as u8;
         UnknownCpu::Uninterrupted(cpu)
     }
 
@@ -269,7 +286,6 @@ mod tests {
         cpu.load_instruction(1, &jump_1);
         cpu.load_instruction(5, &jump_1);
         cpu.load_instruction(9, &jump_1);
-        println!(">>Before: {}", cpu);
         let pc = cpu.program_counter;
         cpu = match cpu.clock() {
             UnknownCpu::Interrupted(_) => panic!("Software interupt called"),
@@ -465,18 +481,22 @@ mod tests {
     }
 
     #[test]
-    fn test_ld8_bo() {
+    fn test_ld8_bo_base() {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
-        for i in 0..10 { 
-            let mut values = [0;(MEMORY_SIZE - 1) as usize];
+        for _ in 0..10 { 
+            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            for i in 0..values.len() {
+                values[i] = i as u8
+            }
             values.try_fill(&mut rng).unwrap();
             for (value, address) in values.iter().zip(0..) {
                 cpu.memory.write(address, *value).ok();
                 //println!("Wrote {} to  {}", value, address);
                 //println!("data {}", cpu.memory);
             }
-            for address in 3..MEMORY_SIZE {
+            for address in 3..31 {
+                println!("{}", address);
                 let mut instruction = Instruction::from_opcode(17, 0);
                 instruction.r_target_set(1);
                 instruction.r_base_set(address);
@@ -487,8 +507,44 @@ mod tests {
                     UnknownCpu::Uninterrupted(cpu) => cpu,
                     UnknownCpu::Interrupted(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
                 };
+                cpu.program_counter = 1;
 
-                assert_eq!(values[address as usize], cpu.read(1));
+                assert_eq!(values[address as usize], cpu.read(1), "{}", instruction);
+            }
+        }
+    }
+
+
+    #[test]
+    fn test_ld8_bo_offset() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for _ in 0..10 { 
+            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            for i in 0..values.len() {
+                values[i] = i as u8
+            }
+            values.try_fill(&mut rng).unwrap();
+            for (value, address) in values.iter().zip(0..) {
+                cpu.memory.write(address, *value).ok();
+                //println!("Wrote {} to  {}", value, address);
+                //println!("data {}", cpu.memory);
+            }
+            for address in 3..MEMORY_SIZE - 1 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(17, 0);
+                instruction.r_target_set(1);
+                instruction.r_base_set(0);
+                instruction.i_offset_set(address as u32);
+                cpu.load_instruction(1, &instruction);
+                println!("|>|>{}\n", instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Uninterrupted(cpu) => cpu,
+                    UnknownCpu::Interrupted(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+                cpu.program_counter = 1;
+
+                assert_eq!(values[address as usize], cpu.read(1), "{}", instruction);
             }
         }
     }

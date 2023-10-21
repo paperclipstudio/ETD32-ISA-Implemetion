@@ -1,4 +1,5 @@
-
+use rand;
+use rand::Rng;
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
     pub carry: bool,
@@ -6,7 +7,7 @@ pub struct Instruction {
     pub equal_to_zero: bool,
     pub greater_than_zero: bool,
     pub opcode: u8,
-    pub operands: u32
+    operands: u32
 }
 
 impl std::fmt::Display for Instruction {
@@ -20,7 +21,7 @@ impl std::fmt::Display for Instruction {
 
         // Opcode
         let opcode: String = format!("{}", self.opcode);
-        write!(fmt, "|{:15}|", match self.opcode {
+        write!(fmt, "|{:20}|", match self.opcode {
             17 => "Load from Mem BO",
             29 => "Jump offset",
             30 => "Jump to Rd",
@@ -33,9 +34,9 @@ impl std::fmt::Display for Instruction {
         match (self.opcode, self.opcode % 2 == 0) {
             // Logic Rd
             (0..=16, false) => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
-            (0..=16, true) => write!(fmt, "Logic RI").ok(),
+            (0..=16, true) => write!(fmt, "Logic RI           |").ok(),
             (17..=28, false) => write!(fmt, "{:4}:{:4}:{:9}|", self.r_target(), self.r_base(), self.i_offset()).ok(),
-            (17..=28, true) => write!(fmt, "Memory").ok(),
+            (17..=28, true) => write!(fmt,  "Memory             |").ok(),
             (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
             (30, _) => write!(fmt, "{:16}|", self.r_dest()).ok(),
             (_, _) => write!(fmt, "???").ok(), //panic!("Opcode is too large")
@@ -79,7 +80,6 @@ impl Instruction {
     }
 
     pub fn decode(value: u32) -> Self {
-        println!(">> {}", value >> 30);
         Instruction {
             carry:             value >> 31 == 1,
             less_than_zero:   (value >> 30) & 1 == 1,
@@ -118,7 +118,7 @@ impl Instruction {
     pub fn r_x_set(&mut self, value: u8) {
         //TODO add tests
         self.operands &= (!(0x1F << 12)) as u32;
-        self.operands |= ((0xFFF & value as u32) << 12) as u32;
+        self.operands |= ((0x1F & value as u32) << 12) as u32;
     }
 
     pub fn r_base(&self) -> u8 {
@@ -150,6 +150,9 @@ impl Instruction {
     }
 
     pub fn i_offset_set(&mut self, value: u32) {
+        if value > 0xFFF{
+            panic!("value is too large")
+        }
         //TODO add tests
         self.operands &= !0xFFF as u32;
         self.operands |= 0xFFF & value;
@@ -261,6 +264,19 @@ mod tests {
         assert_eq!(i.i_offset(), 3968);
         assert_eq!(i.r_index(), 0b11111);
         assert_eq!(i.i(), 569216);
+    }
+
+    #[test] 
+    fn i_offset_set() {
+        let mut rng = rand::thread_rng();
+        let mut instruction = Instruction::from_opcode(0, 0);
+        instruction.i_offset_set(0);
+        assert_eq!(0, instruction.i_offset(), "Failed on value {}", 0);
+        for i in 0..100 {
+            let value = rng.gen::<u32>() & 0xFFF;
+            instruction.i_offset_set(value);
+            assert_eq!(value, instruction.i_offset(), "Failed on value {}, on the {} test", value, i);
+        }
     }
 }
 
