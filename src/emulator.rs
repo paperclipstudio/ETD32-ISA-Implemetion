@@ -17,6 +17,7 @@ impl InterruptedCpu {
     }
 }
 
+#[must_use]
 enum UnknownCpu {
     Inter(InterruptedCpu),
     Ok(Cpu)
@@ -40,6 +41,7 @@ struct Cpu {
 }
 
 impl fmt::Display for Cpu {
+
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         writeln!(fmt, "General {:#?}", self.general_purpose).ok();
         writeln!(fmt, "StackPointer {:#?}", self.stack_pointer).ok();
@@ -69,6 +71,21 @@ impl fmt::Display for Cpu {
 }
 
 impl Cpu {
+    const fn is_valid_register(&self, value: u8) -> bool {
+        return value < 31
+    }
+    
+    // Internal use only
+    fn copy_from_memory(&mut self, from: u8, to:u8) -> Result<(),&'static str> {
+        if !self.is_valid_register(to) {
+            return Err("Invalid register to write too");
+        }
+        let value = self.memory.read(from)
+            .ok_or("Invalid read from memory")?;
+        self.write(to, value);
+        Ok(())
+    }
+
     fn show(&self) -> String {
         let result = format!("GR: {:?}", self.general_purpose);
         result
@@ -143,6 +160,8 @@ impl Cpu {
         println!(">> Inst: {}", instruction);
         match instruction.opcode {
             17 => InstSet::load_8_bo(self),
+            19 => InstSet::load_16_bo(self),
+            21 => InstSet::load_32_bo(self),
             29 => InstSet::jump_offset(self),
             30 => InstSet::jump_to_rd(self),
             31 => InstSet::jump_to_i(self),
@@ -160,16 +179,40 @@ impl InstSet {
     fn load_8_bo(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
         let memory_address = instruction.r_base() + instruction.i_offset() as u8;
-        let value = match cpu.memory.read(memory_address) {
-            Some(value) => value,
-            None => return UnknownCpu::Inter(InterruptedCpu{cpu})
-        };
-        println!("Base {}, Offset {}", instruction.r_base(), instruction.i_offset());
-        println!("M{}", memory_address);
-        println!("{}", cpu.memory);
-        println!("V{}", value);
-        cpu.write(instruction.r_dest(), value);
-        UnknownCpu::Ok(cpu)
+        match cpu.copy_from_memory(memory_address, instruction.r_dest()) {
+            Ok(()) => UnknownCpu::Ok(cpu),
+            Err(msg) => {
+                println!("{msg}"); 
+                return UnknownCpu::Inter(InterruptedCpu{cpu});
+            }
+        }
+    }
+
+    fn load_16_bo(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let memory_address = instruction.r_base() + instruction.i_offset() as u8;
+        //TODO Add a check that this can all be done before hand. ie make atomic
+        for i in 0..2 {
+            println!("ON I {i} {memory_address}");
+            match cpu.copy_from_memory(memory_address + i, instruction.r_dest() + i) {
+                Ok(()) => (),
+                Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
+            }
+        }
+        return UnknownCpu::Ok(cpu)
+    }
+
+    fn load_32_bo(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let memory_address = instruction.r_base() + instruction.i_offset() as u8;
+        //TODO Add a check that this can all be done before hand. ie make atomic
+        for i in 0..4 {
+            match cpu.copy_from_memory(memory_address + i, instruction.r_dest() + i) {
+                Ok(()) => (),
+                Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
+            }
+        }
+        return UnknownCpu::Ok(cpu)
     }
 
     /// Flow Control
@@ -502,7 +545,7 @@ mod tests {
             }
             for address in 4..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(18, 0);
+                let mut instruction = Instruction::from_opcode(19, 0);
                 instruction.r_target_set(1);
                 instruction.r_base_set(address);
                 instruction.i_offset_set(0);
@@ -517,6 +560,50 @@ mod tests {
                 let value = cpu.read(1) << 4 | cpu.read(2);
                 let expected = values[address as usize] << 4 | values[address as usize + 1];
                 assert_eq!(expected, value, "{}", instruction);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ld32_bo_base() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for _ in 0..10 { 
+            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            for i in 0..values.len() {
+                values[i] = i as u8
+            }
+            values.try_fill(&mut rng).unwrap();
+            for (value, address) in values.iter().zip(0..) {
+                cpu.memory.write(address, *value).ok();
+                //println!("Wrote {} to  {}", value, address);
+                //println!("data {}", cpu.memory);
+            }
+            for address in 4..31 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(21, 0);
+                instruction.r_target_set(1);
+                instruction.r_base_set(address);
+                instruction.i_offset_set(0);
+                cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
+                println!("|>|>{}\n", instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Ok(cpu) => cpu,
+                    UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+
+                let value = 
+                    (cpu.read(1) as u32) << 12 | 
+                    (cpu.read(2) as u32) << 8 |
+                    (cpu.read(3) as u32) << 4 |
+                    (cpu.read(4) as u32);
+                let expected = 
+                    (values[address as usize] as u32) << 12 | 
+                    (values[address as usize + 1] as u32) << 8 |
+                    (values[address as usize + 2] as u32) << 4 |
+                    (values[address as usize + 3] as u32);
+                assert_eq!(expected, value, "Inst:{}\nexp:{:X}\nval:{:X}", instruction, expected, value);
             }
         }
     }
