@@ -160,8 +160,11 @@ impl Cpu {
         println!(">> Inst: {}", instruction);
         match instruction.opcode {
             17 => InstSet::load_8_bo(self),
+            18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
+            20 => InstSet::load_16_bi(self),
             21 => InstSet::load_32_bo(self),
+            22 => InstSet::load_32_bi(self),
             29 => InstSet::jump_offset(self),
             30 => InstSet::jump_to_rd(self),
             31 => InstSet::jump_to_i(self),
@@ -178,7 +181,9 @@ impl InstSet {
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
-        let memory_address = instruction.r_base() + instruction.r_index() as u8;
+        let base = cpu.read(instruction.r_base());
+        let index = cpu.read(instruction.r_index());
+        let memory_address = base + index;
         match cpu.copy_from_memory(memory_address, instruction.r_dest()) {
             Ok(()) => UnknownCpu::Ok(cpu),
             Err(msg) => {
@@ -201,19 +206,50 @@ impl InstSet {
         }
     }
 
-    fn load_16_bo(mut cpu: Cpu) -> UnknownCpu {
+    fn load_16_bi(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
         let base = cpu.read(instruction.r_base());
-        let memory_address = base + instruction.i_offset() as u8;
+        let index = cpu.read(instruction.r_index());
+        // TODO Add check for overflow
+        let memory_address = base + index;
         //TODO Add a check that this can all be done before hand. ie make atomic
         for i in 0..2 {
-            println!("ON I {i} {memory_address}");
             match cpu.copy_from_memory(memory_address + i, instruction.r_dest() + i) {
                 Ok(()) => (),
                 Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
             }
         }
         return UnknownCpu::Ok(cpu)
+    }
+
+    fn load_16_bo(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let base = cpu.read(instruction.r_base());
+        // TODO Add check for overflow
+        let memory_address = base + instruction.i_offset() as u8;
+        //TODO Add a check that this can all be done before hand. ie make atomic
+        for i in 0..2 {
+            match cpu.copy_from_memory(memory_address + i, instruction.r_dest() + i) {
+                Ok(()) => (),
+                Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
+            }
+        }
+        return UnknownCpu::Ok(cpu)
+    }
+
+    fn load_32_bi(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let base = cpu.read(instruction.r_base());
+        let index = cpu.read(instruction.r_index());
+        let memory_address = base + index;
+        //TODO Add a check that this can all be done before hand. ie make atomic
+        for i in 0..4 {
+            match cpu.copy_from_memory(memory_address + i, instruction.r_dest() + i) {
+                Ok(()) => (),
+                Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
+            }
+        }
+        UnknownCpu::Ok(cpu)
     }
 
     fn load_32_bo(mut cpu: Cpu) -> UnknownCpu {
