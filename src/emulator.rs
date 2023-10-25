@@ -190,7 +190,8 @@ impl InstSet {
 
     fn load_8_bo(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
-        let memory_address = instruction.r_base() + instruction.i_offset() as u8;
+        let base = cpu.read(instruction.r_base());
+        let memory_address = base + instruction.i_offset() as u8;
         match cpu.copy_from_memory(memory_address, instruction.r_dest()) {
             Ok(()) => UnknownCpu::Ok(cpu),
             Err(msg) => {
@@ -202,7 +203,8 @@ impl InstSet {
 
     fn load_16_bo(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
-        let memory_address = instruction.r_base() + instruction.i_offset() as u8;
+        let base = cpu.read(instruction.r_base());
+        let memory_address = base + instruction.i_offset() as u8;
         //TODO Add a check that this can all be done before hand. ie make atomic
         for i in 0..2 {
             println!("ON I {i} {memory_address}");
@@ -216,7 +218,8 @@ impl InstSet {
 
     fn load_32_bo(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
-        let memory_address = instruction.r_base() + instruction.i_offset() as u8;
+        let base = cpu.read(instruction.r_base());
+        let memory_address = base + instruction.i_offset() as u8;
         //TODO Add a check that this can all be done before hand. ie make atomic
         for i in 0..4 {
             match cpu.copy_from_memory(memory_address + i, instruction.r_dest() + i) {
@@ -486,13 +489,13 @@ mod tests {
                 //println!("Wrote {} to  {}", value, address);
                 //println!("data {}", cpu.memory);
             }
-            for address in 3..31 {
+            for address in 10..31 {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(17, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(2);
-                cpu.write(2, address);
+                instruction.r_base_set(5);
                 instruction.i_offset_set(0);
+                cpu.write(5, address);
                 cpu.load_instruction(1, &instruction);
                 println!("|>|>{}\n", instruction);
                 cpu = match cpu.clock() {
@@ -521,12 +524,13 @@ mod tests {
                 //println!("Wrote {} to  {}", value, address);
                 //println!("data {}", cpu.memory);
             }
-            for address in 3..MEMORY_SIZE - 1 {
+            for address in 6..MEMORY_SIZE - 1 {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(17, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(0);
+                instruction.r_base_set(5);
                 instruction.i_offset_set(address as u32);
+                cpu.write(5, 0);
                 cpu.load_instruction(1, &instruction);
                 println!("|>|>{}\n", instruction);
                 cpu = match cpu.clock() {
@@ -556,12 +560,12 @@ mod tests {
                 //println!("Wrote {} to  {}", value, address);
                 //println!("data {}", cpu.memory);
             }
-            for address in 4..31 {
+            for address in 6..31 {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(19, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(2);
-                cpu.write(address, 2);
+                instruction.r_base_set(5);
+                cpu.write(5, address);
                 instruction.i_offset_set(0);
                 cpu.load_instruction(1, &instruction);
                 cpu.program_counter = 1;
@@ -593,12 +597,12 @@ mod tests {
                 //println!("Wrote {} to  {}", value, address);
                 //println!("data {}", cpu.memory);
             }
-            for address in 4..31 {
+            for address in 5..31 {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(21, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(2);
-                cpu.write(2, address);
+                instruction.r_base_set(5);
+                cpu.write(5, address);
                 instruction.i_offset_set(0);
                 cpu.load_instruction(1, &instruction);
                 cpu.program_counter = 1;
