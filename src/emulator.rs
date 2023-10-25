@@ -176,6 +176,18 @@ impl Cpu {
 struct InstSet {}
 impl InstSet {
     ///Memory
+    fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let memory_address = instruction.r_base() + instruction.r_index() as u8;
+        match cpu.copy_from_memory(memory_address, instruction.r_dest()) {
+            Ok(()) => UnknownCpu::Ok(cpu),
+            Err(msg) => {
+                println!("{msg}"); 
+                return UnknownCpu::Inter(InterruptedCpu{cpu});
+            }
+        }
+    }
+
     fn load_8_bo(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
         let memory_address = instruction.r_base() + instruction.i_offset() as u8;
@@ -212,7 +224,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
             }
         }
-        return UnknownCpu::Ok(cpu)
+        UnknownCpu::Ok(cpu)
     }
 
     /// Flow Control
@@ -478,7 +490,8 @@ mod tests {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(17, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(address);
+                instruction.r_base_set(2);
+                cpu.write(2, address);
                 instruction.i_offset_set(0);
                 cpu.load_instruction(1, &instruction);
                 println!("|>|>{}\n", instruction);
@@ -547,7 +560,8 @@ mod tests {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(19, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(address);
+                instruction.r_base_set(2);
+                cpu.write(address, 2);
                 instruction.i_offset_set(0);
                 cpu.load_instruction(1, &instruction);
                 cpu.program_counter = 1;
@@ -583,7 +597,8 @@ mod tests {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(21, 0);
                 instruction.r_target_set(1);
-                instruction.r_base_set(address);
+                instruction.r_base_set(2);
+                cpu.write(2, address);
                 instruction.i_offset_set(0);
                 cpu.load_instruction(1, &instruction);
                 cpu.program_counter = 1;
