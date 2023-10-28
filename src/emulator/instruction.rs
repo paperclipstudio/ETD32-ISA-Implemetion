@@ -1,5 +1,5 @@
+#[allow(unused_imports)]
 use rand::Rng;
-
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
     pub carry: bool,
@@ -133,8 +133,17 @@ impl Instruction {
         ((self.operands >> 7) & 0x1F) as u8        
     }
 
+    pub fn r_y_set(&mut self, value:u8) {
+        self.operands &= (!(0x1F << 7)) as u32;
+        self.operands |= (0x1F & value as u32) << 7;
+    }
+
     pub fn r_index(&self) -> u8 {
         self.r_y()
+    }
+
+    pub fn r_index_set(&mut self, value:u8) {
+        self.r_y_set(value)
     }
 
     pub fn i_y(&self) -> i16 {

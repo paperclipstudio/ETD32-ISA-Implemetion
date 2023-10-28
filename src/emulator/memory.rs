@@ -1,5 +1,6 @@
 use std::fmt;
 use rand::Rng;
+#[allow(unused_imports)]
 use rand::Fill;
 
 pub const MEMORY_SIZE: u8 = 255;
