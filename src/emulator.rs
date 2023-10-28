@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 mod instruction;
 mod memory;
-use instruction::Instruction;
+
 use std::fmt;
 use rand;
-use memory::*;
+use instruction::Instruction;
+use memory::Memory;
+use memory::SimpleMemory;
 
-
-struct InterruptedCpu {
+pub struct InterruptedCpu {
     pub cpu: Cpu
 }
 
@@ -18,7 +19,7 @@ impl InterruptedCpu {
 }
 
 #[must_use]
-enum UnknownCpu {
+pub enum UnknownCpu {
     Inter(InterruptedCpu),
     Ok(Cpu)
 }
@@ -32,12 +33,12 @@ impl UnknownCpu {
     }
 }
 
-struct Cpu {
+pub struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
     program_counter: u8,
     flag_register: [u8; 4],
-    memory: Box<dyn Memory>,
+    pub memory: Box<dyn Memory>,
 }
 
 impl fmt::Display for Cpu {
@@ -98,7 +99,7 @@ impl Cpu {
         let mut cpu = Cpu {
             general_purpose: [0;29],
             stack_pointer: 0,
-            program_counter: 0,
+            program_counter: 1,
             flag_register: [0;4],
             memory: Box::new(SimpleMemory::new())
         };
@@ -109,7 +110,7 @@ impl Cpu {
         cpu
     }
     /// Creates a new zero'd cpu
-    fn new_blank() -> Cpu {
+    pub fn new_blank() -> Cpu {
         Cpu {
             general_purpose: [0;29],
             stack_pointer: 0,
@@ -147,7 +148,7 @@ impl Cpu {
             (self.read(i + 3) as u32) << 24 )
     }
 
-    fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
+    pub fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
         self.write(location    , (instruction.encode()         & 0xFF) as u8);
         self.write(location + 1, ((instruction.encode() >> 8)  & 0xFF) as u8);
         self.write(location + 2, ((instruction.encode() >> 16) & 0xFF) as u8);
@@ -306,6 +307,7 @@ mod tests {
     use super::*;
     use rand::Rng;
     use rand::Fill;
+    use memory::MEMORY_SIZE;
 
     #[test]
     fn test_program_counter_inc() {
@@ -490,7 +492,7 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
         for i in 0..10 { 
-            let mut values = [0;MEMORY_SIZE as usize];
+            let mut values = [0;memory::MEMORY_SIZE as usize];
             values.try_fill(&mut rng).unwrap();
             
             for (value, address) in values.iter().zip(0..) {
@@ -550,7 +552,7 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
         for _ in 0..10 { 
-            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            let mut values = [43; 32 as usize];
             for i in 0..values.len() {
                 values[i] = i as u8
             }
@@ -560,7 +562,7 @@ mod tests {
                 //println!("Wrote {} to  {}", value, address);
                 //println!("data {}", cpu.memory);
             }
-            for address in 6..MEMORY_SIZE - 1 {
+            for address in 6..31 {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(17, 0);
                 instruction.r_target_set(1);
@@ -586,7 +588,7 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
         for _ in 0..10 { 
-            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            let mut values = [43; MEMORY_SIZE as usize];
             for i in 0..values.len() {
                 values[i] = i as u8
             }
@@ -623,7 +625,7 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
         for _ in 0..10 { 
-            let mut values = [43;(MEMORY_SIZE - 1) as usize];
+            let mut values = [43;MEMORY_SIZE as usize];
             for i in 0..values.len() {
                 values[i] = i as u8
             }
@@ -659,6 +661,31 @@ mod tests {
                     (values[address as usize + 2] as u32) << 4 |
                     (values[address as usize + 3] as u32);
                 assert_eq!(expected, value, "Inst:{}\nexp:{:X}\nval:{:X}", instruction, expected, value);
+            }
+        }
+    }
+
+    #[test]
+    fn test_st_bo_base() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for _ in 0..10 { 
+            for address in 8..31 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(23, 0);
+                instruction.r_target_set(5);
+                instruction.r_base_set(address);
+                instruction.i_offset_set(0);
+                let rand_value = rng.gen();
+                cpu.write(5, rand_value);
+                cpu.load_instruction(1, &instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Ok(cpu) => cpu,
+                    UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+
+                let value = cpu.read(5);
+                assert_eq!(rand_value, value, "Inst:{}\nexp:{:X}\nval:{:X}", instruction, rand_value, value);
             }
         }
     }
