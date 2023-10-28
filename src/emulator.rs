@@ -76,7 +76,6 @@ impl Cpu {
         return value < 31
     }
     
-    // Internal use only
     fn copy_from_memory(&mut self, from: u8, to:u8) -> Result<(),&'static str> {
         if !self.is_valid_register(to) {
             return Err("Invalid register to write too");
@@ -84,6 +83,15 @@ impl Cpu {
         let value = self.memory.read(from)
             .ok_or("Invalid read from memory")?;
         self.write(to, value);
+        Ok(())
+    }
+
+    fn copy_to_memory(&mut self, from: u8, to:u8) -> Result<(),&'static str> {
+        if !self.is_valid_register(from) {
+            return Err("Invalid register to write to");
+        }
+        let value = self.read(from);
+        self.memory.write(to, value)?;
         Ok(())
     }
 
@@ -158,7 +166,6 @@ impl Cpu {
     /// Simulates a rising edge on the clock 
     pub fn clock(self) -> UnknownCpu {
         let instruction = self.current_instruction();
-        println!(">> Inst: {}", instruction);
         match instruction.opcode {
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
@@ -166,6 +173,7 @@ impl Cpu {
             20 => InstSet::load_16_bi(self),
             21 => InstSet::load_32_bo(self),
             22 => InstSet::load_32_bi(self),
+            23 => InstSet::store_8_bo(self),
             29 => InstSet::jump_offset(self),
             30 => InstSet::jump_to_rd(self),
             31 => InstSet::jump_to_i(self),
@@ -263,6 +271,19 @@ impl InstSet {
                 Ok(()) => (),
                 Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
             }
+        }
+        UnknownCpu::Ok(cpu)
+    }
+
+    fn store_8_bo(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let base = cpu.read(instruction.r_base());
+        let memory_address = base + instruction.i_offset() as u8;
+        println!("STORE|FROM:{}, TO:{}", instruction.r_target(), memory_address);
+        //TODO Add a check that this can all be done before hand. ie make atomic
+        match cpu.copy_to_memory(instruction.r_target(), memory_address) {
+            Ok(()) => (),
+            Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
         }
         UnknownCpu::Ok(cpu)
     }
@@ -669,23 +690,25 @@ mod tests {
     fn test_st_bo_base() {
         let mut cpu = Cpu::new_blank();
         let mut rng = rand::thread_rng();
-        for _ in 0..10 { 
+        for i in 0..10 { 
             for address in 8..31 {
                 println!("{}", address);
                 let mut instruction = Instruction::from_opcode(23, 0);
                 instruction.r_target_set(5);
-                instruction.r_base_set(address);
+                instruction.r_base_set(6);
                 instruction.i_offset_set(0);
                 let rand_value = rng.gen();
                 cpu.write(5, rand_value);
+                cpu.write(6, address);
+
                 cpu.load_instruction(1, &instruction);
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
                 };
 
-                let value = cpu.read(5);
-                assert_eq!(rand_value, value, "Inst:{}\nexp:{:X}\nval:{:X}", instruction, rand_value, value);
+                let value = cpu.memory.read(address).unwrap();
+                assert_eq!(rand_value, value, "{}:{}|Inst:{}\nexp:{:X}\nval:{:X}", i, address, instruction, rand_value, value);
             }
         }
     }
