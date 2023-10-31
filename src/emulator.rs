@@ -176,6 +176,9 @@ impl Cpu {
             23 => InstSet::store_8_bo(self),
             24 => InstSet::store_8_bi(self),
             25 => InstSet::store_16_bo(self),
+            26 => InstSet::store_16_bi(self),
+            27 => InstSet::store_32_bo(self),
+            28 => InstSet::store_32_bi(self),
             29 => InstSet::jump_offset(self),
             30 => InstSet::jump_to_rd(self),
             31 => InstSet::jump_to_i(self),
@@ -309,6 +312,36 @@ impl InstSet {
         println!("STORE|FROM:{}, TO:{}", instruction.r_target(), memory_address);
         //TODO Make atomic
         for i in 0..2 {
+            match cpu.copy_to_memory(instruction.r_target() + i, memory_address + i) {
+                Ok(()) => (),
+                Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
+            }
+        }
+        UnknownCpu::Ok(cpu)
+    }
+
+    fn store_16_bi(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let base = cpu.read(instruction.r_base());
+        let offset = cpu.read(instruction.r_index());
+        let memory_address = base + offset;
+        println!("STORE|FROM:{}, TO:{}", instruction.r_target(), memory_address);
+        for i in 0..2 {
+            match cpu.copy_to_memory(instruction.r_target() + i, memory_address + i) {
+                Ok(()) => (),
+                Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
+            }
+        }
+        UnknownCpu::Ok(cpu)
+    }
+
+    fn store_32_bi(mut cpu: Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let base = cpu.read(instruction.r_base());
+        let offset = cpu.read(instruction.r_index());
+        let memory_address = base + offset;
+        println!("STORE|FROM:{}, TO:{}", instruction.r_target(), memory_address);
+        for i in 0..4 {
             match cpu.copy_to_memory(instruction.r_target() + i, memory_address + i) {
                 Ok(()) => (),
                 Err(_msg) => return UnknownCpu::Inter(InterruptedCpu{cpu}),
@@ -824,8 +857,8 @@ mod tests {
                 instruction.r_base_set(7);
                 instruction.i_offset_set(address as u32);
                 let rand_value: u16 = rng.gen();
-                cpu.write(5, (rand_value >> 8) as u8);
-                cpu.write(6, (rand_value & 0xFF) as u8);
+                cpu.write(5, (rand_value & 0xFF) as u8);
+                cpu.write(6, (rand_value >> 8) as u8 & 0xFF );
                 cpu.write(7, 0);
 
                 cpu.load_instruction(1, &instruction);
@@ -834,9 +867,106 @@ mod tests {
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
                 };
 
-                let value = (cpu.memory.read(address).unwrap() as u16) << 8 |
-                    (cpu.memory.read(address + 1).unwrap()) as u16;
+                let value = (cpu.memory.read(address).unwrap() as u16) |
+                    ((cpu.memory.read(address + 1).unwrap()) as u16) << 8;
                 assert_eq!(rand_value, value as u16, "{}:{}|Inst:{}\nexp:{:X}\nval:{:X}", i, address, instruction, rand_value, value);
+            }
+        }
+    }
+
+    #[test]
+    fn test_st_32_bo_offset() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for i in 0..10 { 
+            for address in 10..31 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(27, 0);
+                instruction.r_target_set(5);
+                instruction.r_base_set(9);
+                instruction.i_offset_set(address as u32);
+                let rand_value: u32 = rng.gen();
+                cpu.write(5, (rand_value       & 0xFF) as u8);
+                cpu.write(6, (rand_value >>  8 & 0xFF) as u8);
+                cpu.write(7, (rand_value >> 16 & 0xFF) as u8);
+                cpu.write(8, (rand_value >> 24 & 0xFF) as u8);
+                cpu.write(9, 0);
+
+                cpu.load_instruction(1, &instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Ok(cpu) => cpu,
+                    UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+
+                let value = (cpu.memory.read(address).unwrap() as u32)   |
+                    (cpu.memory.read(address + 1).unwrap() as u32) <<  8 | 
+                    (cpu.memory.read(address + 2).unwrap() as u32) << 16 |
+                    (cpu.memory.read(address + 3).unwrap() as u32) << 24;
+                assert_eq!(rand_value, value as u32, "{}:{}|Inst:{}\nexp:{:X}\nval:{:X}", i, address, instruction, rand_value, value);
+            }
+        }
+    }
+
+    #[test]
+    fn test_st_16_bi() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for i in 0..10 { 
+            for address in 8..31 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(26, 0);
+                instruction.r_target_set(5);
+                instruction.r_base_set(7);
+                instruction.r_index_set(8);
+                let rand_value: u16 = rng.gen();
+                cpu.write(5, (rand_value & 0xFF) as u8);
+                cpu.write(6, ((rand_value >> 8) & 0xFF) as u8);
+                cpu.write(7, address);
+                cpu.write(8, 0);
+
+                cpu.load_instruction(1, &instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Ok(cpu) => cpu,
+                    UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+
+                let value = cpu.memory.read(address).unwrap() as u16 | 
+                    ((cpu.memory.read(address + 1).unwrap() as u16) << 8);
+                assert_eq!(rand_value, value, "{}:{}|Inst:{}\nexp:{:X}\nval:{:X}", i, address, instruction, rand_value, value);
+            }
+        }
+    }
+
+    #[test]
+    fn test_st_32_bi() {
+        let mut cpu = Cpu::new_blank();
+        let mut rng = rand::thread_rng();
+        for i in 0..10 { 
+            for address in 11..31 {
+                println!("{}", address);
+                let mut instruction = Instruction::from_opcode(28, 0);
+                instruction.r_target_set(5);
+                instruction.r_base_set(9);
+                instruction.r_index_set(10);
+                let rand_value: u32 = rng.gen();
+                cpu.write(5, (rand_value         & 0xFF) as u8);
+                cpu.write(6, ((rand_value >>  8) & 0xFF) as u8);
+                cpu.write(7, ((rand_value >> 16) & 0xFF) as u8);
+                cpu.write(8, ((rand_value >> 24) & 0xFF) as u8);
+                cpu.write(9, address);
+                cpu.write(10, 0);
+
+                cpu.load_instruction(1, &instruction);
+                cpu = match cpu.clock() {
+                    UnknownCpu::Ok(cpu) => cpu,
+                    UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu.release()),
+                };
+
+                let value = cpu.memory.read(address).unwrap() as u32 | 
+                    ((cpu.memory.read(address + 1).unwrap() as u32) << 8) |
+                    ((cpu.memory.read(address + 2).unwrap() as u32) << 16)|
+                    ((cpu.memory.read(address + 3).unwrap() as u32) << 24);
+                assert_eq!(rand_value, value, "{}:{}|Inst:{}\nexp:{:X}\nval:{:X}", i, address, instruction, rand_value, value);
             }
         }
     }
