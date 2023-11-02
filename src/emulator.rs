@@ -148,6 +148,10 @@ impl Cpu {
     pub fn clock(self) -> UnknownCpu {
         let instruction = self.current_instruction();
         match instruction.opcode {
+            0 => InstSet::logical_left_shift_rd(self),
+            1 => InstSet::logical_left_shift_ri(self),
+            2 => InstSet::logical_right_shift_rd(self),
+            3 => InstSet::logical_right_shift_ri(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -173,6 +177,58 @@ impl Cpu {
 
 struct InstSet {}
 impl InstSet {
+    /// Operations
+    fn logical_right_shift_rd(mut cpu:Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let value = cpu.read(instruction.r_x());
+        let shift = cpu.read(instruction.r_y());
+        println!("SHIFT{shift:X}");
+        if shift > 0 {
+            cpu.write(
+                instruction.r_dest(),
+                (value >> shift) & 0xFF
+                );
+        }
+        UnknownCpu::Ok(cpu)
+    }
+    fn logical_right_shift_ri(mut cpu:Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let value = cpu.read(instruction.r_x());
+        let shift = instruction.i_y();
+        println!("SHIFT{shift:X}");
+        if shift > 0 {
+            cpu.write(
+                instruction.r_dest(),
+                (value >> shift) & 0xFF
+                );
+        }
+        UnknownCpu::Ok(cpu)
+    }
+
+    fn logical_left_shift_rd(mut cpu:Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let value = cpu.read(instruction.r_x());
+        let shift = cpu.read(instruction.r_y());
+
+        cpu.write(
+            instruction.r_dest(),
+            (value << shift) & 0xFF
+            );
+        UnknownCpu::Ok(cpu)
+    }
+
+    fn logical_left_shift_ri(mut cpu:Cpu) -> UnknownCpu {
+        let instruction = cpu.current_instruction();
+        let value = cpu.read(instruction.r_x());
+        let shift = instruction.i_y() as u8;
+
+        cpu.write(
+            instruction.r_dest(),
+            (value << shift) & 0xFF
+            );
+        UnknownCpu::Ok(cpu)
+    }
+
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
@@ -950,5 +1006,108 @@ mod tests {
                 assert_eq!(rand_value, value, "{}:{}|Inst:{}\nexp:{:X}\nval:{:X}", i, address, instruction, rand_value, value);
             }
         }
+    }
+    
+    #[test]
+    fn test_logic_left_shift_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(0, 0);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x01);
+        cpu.write(7, 1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x02, cpu.read(5));
+    }
+
+    #[test]
+    fn test_logic_left_shift_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(1, 0);
+        instruction.r_dest_set(5);
+        // Value
+        instruction.r_x_set(6);
+        cpu.write(6, 0x01);
+        // Shift
+        instruction.i_y_set(2);
+        cpu.write(7, 1);
+        cpu.load_instruction(1, &instruction);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x04, cpu.read(5));
+    }
+    #[test]
+    fn test_logic_left_shift_ri_negitive() {
+        // If shift value is negative then nothing should happen
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(0, 0);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(0x801);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x01);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x01, cpu.read(5));
+    }
+
+    #[test]
+    fn test_logic_right_shift_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(2, 0);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        println!("{instruction}");
+        cpu.write(6, 0x02);
+        cpu.write(7, 1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x01, cpu.read(5));
+    }
+
+    #[test]
+    fn test_logic_right_shift_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(3, 0);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(1);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x02);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x01, cpu.read(5));
+    }
+
+    #[test]
+    fn test_logic_left_shift_overflow() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(0, 0);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x80);
+        cpu.write(7, 1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x00, cpu.read(5));
     }
 }   

@@ -34,7 +34,7 @@ impl std::fmt::Display for Instruction {
         match (self.opcode, self.opcode % 2 == 0) {
             // Logic Rd
             (0..=16, false)             => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
-            (0..=16, true)              => write!(fmt, "Logic RI           |").ok(),
+            (0..=16, true)              => write!(fmt, "{:4}:{:4}:{:9}|", self.r_dest(), self.r_x(), self.i_y()).ok(),
             (17..=28, false)            => write!(fmt, "{:4}:{:4}:{:9}|", self.r_target(), self.r_base(), self.i_offset()).ok(),
             (17..=28, true)             => write!(fmt, "Memory             |").ok(),
             (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
@@ -89,6 +89,9 @@ impl Instruction {
             operands:   value       & 0x3FFFFF,
         }
     }
+
+    // Should restructer this...... 
+    // Yuck
 
     pub fn r_dest(&self) -> u8 {
         (self.operands >> 17) as u8        
@@ -145,13 +148,19 @@ impl Instruction {
     pub fn r_index_set(&mut self, value:u8) {
         self.r_y_set(value)
     }
-
+    
+    //////
     pub fn i_y(&self) -> i16 {
-        if self.operands & 0x800 != 0 {
-            0 - (self.operands & 0x7FF) as i16
-        } else {
+        if self.operands & 0x800 == 0 {
             (self.operands & 0x7FF) as i16        
+        } else {
+            0 - (self.operands & 0x7FF) as i16
         }
+    }
+
+    pub fn i_y_set(&mut self, value:u16) {
+        self.operands &= !0xFFF;
+        self.operands |= (value & 0xFFF) as u32;
     }
 
     pub fn i_offset(&self) -> u32 {
