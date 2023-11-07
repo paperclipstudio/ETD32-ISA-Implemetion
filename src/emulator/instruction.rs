@@ -51,14 +51,14 @@ impl std::fmt::Display for Instruction {
 }
 
 impl Instruction {
-    pub fn from_opcode(opcode: u8, operands: u32) -> Self {
+    pub fn from_opcode(opcode: u8) -> Self {
        Instruction {
             carry: false,
             less_than_zero: false,
             equal_to_zero: false,
             greater_than_zero: false,
             opcode,
-            operands
+            operands: 0,
        }
     }
 
@@ -90,11 +90,32 @@ impl Instruction {
         }
     }
 
+    // Returns 21-17
+    fn first(&self) -> u8 {
+        (self.operands >> 17) as u8        
+    }
+
+    // Returns 16-12
+    fn second(&self) -> u8 {
+        ((self.operands >> 12) & 0x1F) as u8        
+    }
+
+    // Returns 11-7
+    fn third(&self) -> u8 {
+        ((self.operands >> 7) & 0x1F) as u8        
+    }
+
+    // Returns 6-0
+    fn fourth(&self) -> u8 {
+        (self.operands & 0x1F) as u8        
+    }
+
+
     // Should restructer this...... 
     // Yuck
 
     pub fn r_dest(&self) -> u8 {
-        (self.operands >> 17) as u8        
+        self.first()
     }
 
     pub fn r_dest_set(&mut self, value:u8) {
@@ -115,7 +136,7 @@ impl Instruction {
     }
 
     pub fn r_x(&self) -> u8 {
-        ((self.operands >> 12) & 0x1F) as u8        
+        self.second()
     }
 
     pub fn r_x_set(&mut self, value: u8) {
@@ -185,6 +206,16 @@ impl Instruction {
         }
     }
 
+    pub fn i_set(&mut self, mut value: i32) {
+        self.operands = 0;
+        if value > 0 {
+            self.operands |= 1 << 21;
+        } 
+        // maybe throw error here if value is too large?
+        value &= 0x1FFFFF;
+        self.operands = value.abs() as u32;
+    }
+
 }
 
 #[cfg(test)]
@@ -193,7 +224,9 @@ mod tests {
 
     #[test]
     fn encode_interupt() {
-        let instruction = Instruction::from_opcode(32, 0xABC);
+        let mut instruction = Instruction::from_opcode(32);
+        instruction.operands = 0xABC;
+
         let target = 0x0800_0ABC;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
@@ -201,7 +234,8 @@ mod tests {
     
     #[test]
     fn encode_flags() {
-        let mut instruction = Instruction::from_opcode(32, 0xABC);
+        let mut instruction = Instruction::from_opcode(32);
+        instruction.operands = 0xABC;
         instruction.carry = true;
         let target = 0x8800_0ABC;
         let result = instruction.encode();
@@ -225,7 +259,8 @@ mod tests {
 
     #[test]
     fn decode_flags() {
-        let mut instruction = Instruction::from_opcode(32, 0xABC);
+        let mut instruction = Instruction::from_opcode(32);
+        instruction.operands = 0xABC;
         instruction.carry = true;
         let mut target = 0x8800_0ABC;
         let mut result = Instruction::decode(target);
@@ -249,7 +284,8 @@ mod tests {
 
     #[test]
     fn encode_jump_offset() {
-        let instruction = Instruction::from_opcode(31, 0xDCA);
+        let mut instruction = Instruction::from_opcode(31);
+        instruction.operands = 0xDCA;
         let target = 0x07C0_0DCA;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
@@ -257,7 +293,8 @@ mod tests {
 
     #[test]
     fn operand_encoding_rd() {
-        let i = Instruction::from_opcode(0, 0b11011_10101_00000_1111111);
+        let mut i = Instruction::from_opcode(0);
+        i.operands = 0b11011_10101_00000_1111111;
         assert_eq!(i.r_dest(), 0b11011);
         assert_eq!(i.r_x(), 0b10101);
         assert_eq!(i.r_y(), 0b00000);
@@ -272,7 +309,8 @@ mod tests {
 
     #[test]
     fn operand_encoding_negitive() {
-        let i = Instruction::from_opcode(0, 0b00100_01010_11111_0000000);
+        let mut i = Instruction::from_opcode(0);
+        i.operands = 0b00100_01010_11111_0000000;
         assert_eq!(i.r_dest(), 0b00100);
         assert_eq!(i.r_x(), 0b01010);
         assert_eq!(i.r_y(), 31);
@@ -287,7 +325,7 @@ mod tests {
     #[test] 
     fn i_offset_set() {
         let mut rng = rand::thread_rng();
-        let mut instruction = Instruction::from_opcode(0, 0);
+        let mut instruction = Instruction::from_opcode(0);
         instruction.i_offset_set(0);
         assert_eq!(0, instruction.i_offset(), "Failed on value {}", 0);
         for i in 0..100 {

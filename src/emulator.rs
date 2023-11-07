@@ -449,7 +449,9 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         cpu.program_counter = 1;
         // Load in jump + 1 commands
-        let jump_1 = Instruction::from_opcode(29, 4);
+        let mut jump_1 = Instruction::from_opcode(29);
+
+        jump_1.i_set(4);
         cpu.load_instruction(1, &jump_1);
         cpu.load_instruction(5, &jump_1);
         cpu.load_instruction(9, &jump_1);
@@ -512,7 +514,7 @@ mod tests {
     fn test_software_interrupt() {
         let mut cpu = Cpu::new_blank();
         cpu.program_counter = 1;
-        let throw_interupt = Instruction::from_opcode(32, 0);
+        let throw_interupt = Instruction::from_opcode(32);
         cpu.load_instruction(1, &throw_interupt);
         match cpu.clock() {
             UnknownCpu::Inter(_) => (),
@@ -524,7 +526,8 @@ mod tests {
     fn test_load_instruction() {
         let mut cpu = Cpu::new_blank();
         // Load in jump + 1 commands
-        let jump_1 = Instruction::from_opcode(29, 4);
+        let mut jump_1 = Instruction::from_opcode(29);
+        jump_1.i_set(4);
         cpu.load_instruction(1, &jump_1);
         cpu.load_instruction(5, &jump_1);
         cpu.load_instruction(9, &jump_1);
@@ -540,12 +543,16 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         // Fill with Intrupts
         for i in 0..15 {
-            let intrupt = Instruction::from_opcode(32, 21);
+            let mut intrupt = Instruction::from_opcode(32);
+            intrupt.opcode = 21;
             cpu.load_instruction(i * 4 + 1, &intrupt);
         }
-        let jump_to_1 = Instruction::from_opcode(31,  1);
-        let jump_to_21 = Instruction::from_opcode(31, 21);
-        let jump_to_9 = Instruction::from_opcode(31, 9);
+        let mut jump_to_1 = Instruction::from_opcode(31);
+        jump_to_1.opcode = 1;
+        let mut jump_to_21 = Instruction::from_opcode(31);
+        jump_to_21.opcode = 21;
+        let mut jump_to_9 = Instruction::from_opcode(31);
+        jump_to_9.opcode = 9;
 
         cpu.load_instruction( 1, &jump_to_9);
         cpu.load_instruction(9, &jump_to_21);
@@ -576,13 +583,14 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         // Fill with Intrupts
         for i in 0..15 {
-            let intrupt = Instruction::from_opcode(32, 21);
+            let mut intrupt = Instruction::from_opcode(32);
+            intrupt.opcode = 21;
             cpu.load_instruction(i * 4 + 1, &intrupt);
         }
 
-        let mut jump_to_1 = Instruction::from_opcode(30,  0);
-        let mut jump_to_21 = Instruction::from_opcode(30, 0);
-        let mut jump_to_9 = Instruction::from_opcode(30, 0);
+        let mut jump_to_1 = Instruction::from_opcode(30);
+        let mut jump_to_21 = Instruction::from_opcode(30);
+        let mut jump_to_9 = Instruction::from_opcode(30);
         println!("Set 1");
         // We will jump to the value in register 10
         jump_to_1.r_dest_set(6);
@@ -664,7 +672,7 @@ mod tests {
             }
             for address in 10..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(17, 0);
+                let mut instruction = Instruction::from_opcode(17);
                 instruction.r_target_set(1);
                 instruction.r_base_set(5);
                 instruction.i_offset_set(0);
@@ -699,7 +707,7 @@ mod tests {
             }
             for address in 6..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(17, 0);
+                let mut instruction = Instruction::from_opcode(17);
                 instruction.r_target_set(1);
                 instruction.r_base_set(5);
                 instruction.i_offset_set(address as u32);
@@ -735,7 +743,7 @@ mod tests {
             }
             for address in 6..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(19, 0);
+                let mut instruction = Instruction::from_opcode(19);
                 instruction.r_target_set(1);
                 instruction.r_base_set(5);
                 cpu.write(5, address);
@@ -772,7 +780,7 @@ mod tests {
             }
             for address in 5..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(21, 0);
+                let mut instruction = Instruction::from_opcode(21);
                 instruction.r_target_set(1);
                 instruction.r_base_set(5);
                 cpu.write(5, address);
@@ -807,7 +815,7 @@ mod tests {
         for i in 0..10 { 
             for address in 8..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(23, 0);
+                let mut instruction = Instruction::from_opcode(23);
                 instruction.r_target_set(5);
                 instruction.r_base_set(6);
                 instruction.i_offset_set(0);
@@ -834,7 +842,7 @@ mod tests {
         for i in 0..10 { 
             for address in 8..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(23, 0);
+                let mut instruction = Instruction::from_opcode(23);
                 instruction.r_target_set(5);
                 instruction.r_base_set(6);
                 instruction.i_offset_set(address as u32);
@@ -861,7 +869,7 @@ mod tests {
         for i in 0..10 { 
             for address in 8..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(24, 0);
+                let mut instruction = Instruction::from_opcode(24);
                 instruction.r_target_set(5);
                 instruction.r_base_set(6);
                 instruction.r_index_set(7);
@@ -889,7 +897,7 @@ mod tests {
         for i in 0..10 { 
             for address in 8..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(25, 0);
+                let mut instruction = Instruction::from_opcode(25);
                 instruction.r_target_set(5);
                 instruction.r_base_set(7);
                 instruction.i_offset_set(address as u32);
@@ -918,7 +926,7 @@ mod tests {
         for i in 0..10 { 
             for address in 10..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(27, 0);
+                let mut instruction = Instruction::from_opcode(27);
                 instruction.r_target_set(5);
                 instruction.r_base_set(9);
                 instruction.i_offset_set(address as u32);
@@ -951,7 +959,7 @@ mod tests {
         for i in 0..10 { 
             for address in 8..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(26, 0);
+                let mut instruction = Instruction::from_opcode(26);
                 instruction.r_target_set(5);
                 instruction.r_base_set(7);
                 instruction.r_index_set(8);
@@ -981,7 +989,7 @@ mod tests {
         for i in 0..10 { 
             for address in 11..31 {
                 println!("{}", address);
-                let mut instruction = Instruction::from_opcode(28, 0);
+                let mut instruction = Instruction::from_opcode(28);
                 instruction.r_target_set(5);
                 instruction.r_base_set(9);
                 instruction.r_index_set(10);
@@ -1011,7 +1019,7 @@ mod tests {
     #[test]
     fn test_logic_left_shift_rd() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(0, 0);
+        let mut instruction = Instruction::from_opcode(0);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.r_y_set(7);
@@ -1028,7 +1036,7 @@ mod tests {
     #[test]
     fn test_logic_left_shift_ri() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(1, 0);
+        let mut instruction = Instruction::from_opcode(1);
         instruction.r_dest_set(5);
         // Value
         instruction.r_x_set(6);
@@ -1043,11 +1051,12 @@ mod tests {
         };
         assert_eq!(0x04, cpu.read(5));
     }
+
     #[test]
     fn test_logic_left_shift_ri_negitive() {
         // If shift value is negative then nothing should happen
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(0, 0);
+        let mut instruction = Instruction::from_opcode(0);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.i_y_set(0x801);
@@ -1063,7 +1072,7 @@ mod tests {
     #[test]
     fn test_logic_right_shift_rd() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(2, 0);
+        let mut instruction = Instruction::from_opcode(2);  
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.r_y_set(7);
@@ -1081,7 +1090,7 @@ mod tests {
     #[test]
     fn test_logic_right_shift_ri() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(3, 0);
+        let mut instruction = Instruction::from_opcode(3);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.i_y_set(1);
@@ -1097,7 +1106,7 @@ mod tests {
     #[test]
     fn test_logic_left_shift_overflow() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(0, 0);
+        let mut instruction = Instruction::from_opcode(0);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.r_y_set(7);
