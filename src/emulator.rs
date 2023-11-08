@@ -154,6 +154,8 @@ impl Cpu {
             3 => InstSet::logical_right_shift_ri(self),
             4 => InstSet::logical_and_rd(self),
             5 => InstSet::logical_and_ri(self),
+            6 => InstSet::logical_or_rd(self),
+            7 => InstSet::logical_or_ri(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -196,6 +198,12 @@ impl InstSet {
             let instruction = cpu.current_instruction();
             let x = cpu.read(instruction.r_x());
             let y = instruction.i_y();
+            if y < 0 { 
+                panic!("What should I do with a negitive y value?");
+            }
+            if y > i8::MAX.into() { 
+                panic!("What should I do with a y value to large for target?");
+            }
             cpu.write(
                 instruction.r_dest(),
                 op(x, y)
@@ -221,17 +229,19 @@ impl InstSet {
     }
 
     fn logical_and_ri(cpu:Cpu) -> UnknownCpu {
-        if cpu.current_instruction().i_y() < 0 { 
-            panic!("What should I do with a negitive y value?");
-        }
-        if cpu.current_instruction().i_y() > i8::MAX.into() { 
-            panic!("What should I do with a y value to large for target?");
-        }
          InstSet::apply_ri_function(cpu, |x, y| x & y as u8)
     }
 
     fn logical_and_rd(cpu:Cpu) -> UnknownCpu {
         InstSet::apply_rd_function(cpu, |x, y| x & y)
+    }
+
+    fn logical_or_ri(cpu:Cpu) -> UnknownCpu {
+         InstSet::apply_ri_function(cpu, |x, y| x | y as u8)
+    }
+
+    fn logical_or_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |x, y| x | y)
     }
 
     ///Memory
