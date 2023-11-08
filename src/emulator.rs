@@ -152,6 +152,8 @@ impl Cpu {
             1 => InstSet::logical_left_shift_ri(self),
             2 => InstSet::logical_right_shift_rd(self),
             3 => InstSet::logical_right_shift_ri(self),
+            4 => InstSet::logical_and_rd(self),
+            5 => InstSet::logical_and_ri(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -177,56 +179,59 @@ impl Cpu {
 
 struct InstSet {}
 impl InstSet {
+    fn apply_rd_function<F>(mut cpu:Cpu, op:F) -> UnknownCpu 
+        where F: Fn(u8, u8) -> u8 {
+            let instruction = cpu.current_instruction();
+            let x = cpu.read(instruction.r_x());
+            let y = cpu.read(instruction.r_y());
+            cpu.write(
+                instruction.r_dest(),
+                op(x, y)
+                );
+            UnknownCpu::Ok(cpu)
+        }
+
+    fn apply_ri_function<F>(mut cpu:Cpu, op:F) -> UnknownCpu 
+        where F: Fn(u8, i16) -> u8 {
+            let instruction = cpu.current_instruction();
+            let x = cpu.read(instruction.r_x());
+            let y = instruction.i_y();
+            cpu.write(
+                instruction.r_dest(),
+                op(x, y)
+                );
+            UnknownCpu::Ok(cpu)
+        }
+
     /// Operations
-    fn logical_right_shift_rd(mut cpu:Cpu) -> UnknownCpu {
-        let instruction = cpu.current_instruction();
-        let value = cpu.read(instruction.r_x());
-        let shift = cpu.read(instruction.r_y());
-        println!("SHIFT{shift:X}");
-        if shift > 0 {
-            cpu.write(
-                instruction.r_dest(),
-                (value >> shift) & 0xFF
-                );
+    fn logical_right_shift_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |value, shift| (value >> shift) & 0xFF)
+    }
+
+    fn logical_right_shift_ri(cpu:Cpu) -> UnknownCpu {
+         InstSet::apply_ri_function(cpu, |value, shift| (value >> shift) & 0xFF)
+    }
+
+    fn logical_left_shift_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |value, shift| (value << shift) & 0xFF)
+    }
+
+    fn logical_left_shift_ri(cpu:Cpu) -> UnknownCpu {
+         InstSet::apply_ri_function(cpu, |value, shift| (value << shift) & 0xFF)
+    }
+
+    fn logical_and_ri(cpu:Cpu) -> UnknownCpu {
+        if cpu.current_instruction().i_y() < 0 { 
+            panic!("What should I do with a negitive y value?");
         }
-        UnknownCpu::Ok(cpu)
-    }
-    fn logical_right_shift_ri(mut cpu:Cpu) -> UnknownCpu {
-        let instruction = cpu.current_instruction();
-        let value = cpu.read(instruction.r_x());
-        let shift = instruction.i_y();
-        println!("SHIFT{shift:X}");
-        if shift > 0 {
-            cpu.write(
-                instruction.r_dest(),
-                (value >> shift) & 0xFF
-                );
+        if cpu.current_instruction().i_y() > i8::MAX.into() { 
+            panic!("What should I do with a y value to large for target?");
         }
-        UnknownCpu::Ok(cpu)
+         InstSet::apply_ri_function(cpu, |x, y| x & y as u8)
     }
 
-    fn logical_left_shift_rd(mut cpu:Cpu) -> UnknownCpu {
-        let instruction = cpu.current_instruction();
-        let value = cpu.read(instruction.r_x());
-        let shift = cpu.read(instruction.r_y());
-
-        cpu.write(
-            instruction.r_dest(),
-            (value << shift) & 0xFF
-            );
-        UnknownCpu::Ok(cpu)
-    }
-
-    fn logical_left_shift_ri(mut cpu:Cpu) -> UnknownCpu {
-        let instruction = cpu.current_instruction();
-        let value = cpu.read(instruction.r_x());
-        let shift = instruction.i_y() as u8;
-
-        cpu.write(
-            instruction.r_dest(),
-            (value << shift) & 0xFF
-            );
-        UnknownCpu::Ok(cpu)
+    fn logical_and_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |x, y| x & y)
     }
 
     ///Memory
