@@ -1151,4 +1151,21 @@ mod tests {
         };
         assert_eq!(0x00, cpu.read(5));
     }
+
+    #[test]
+    fn test_logic_add() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x07);
+        cpu.write(7, 1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x10, cpu.read(5));
+    }
 }   
