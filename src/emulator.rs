@@ -155,7 +155,9 @@ impl Cpu {
             4 => InstSet::logical_and_rd(self),
             5 => InstSet::logical_and_ri(self),
             6 => InstSet::logical_or_rd(self),
-            7 => InstSet::logical_or_ri(self),
+            7 => InstSet::logical_xor_ri(self),
+            8 => InstSet::logical_xor_rd(self),
+            9 => InstSet::logical_or_ri(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -244,6 +246,13 @@ impl InstSet {
         InstSet::apply_rd_function(cpu, |x, y| x | y)
     }
 
+    fn logical_xor_ri(cpu:Cpu) -> UnknownCpu {
+         InstSet::apply_ri_function(cpu, |x, y| x ^ y as u8)
+    }
+
+    fn logical_xor_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |x, y| x ^ y)
+    }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
