@@ -548,11 +548,11 @@ mod tests {
             cpu.load_instruction(i * 4 + 1, &intrupt);
         }
         let mut jump_to_1 = Instruction::from_opcode(31);
-        jump_to_1.opcode = 1;
+        jump_to_1.i_set(1);
         let mut jump_to_21 = Instruction::from_opcode(31);
-        jump_to_21.opcode = 21;
+        jump_to_21.i_set(21);
         let mut jump_to_9 = Instruction::from_opcode(31);
-        jump_to_9.opcode = 9;
+        jump_to_9.i_set(9);
 
         cpu.load_instruction( 1, &jump_to_9);
         cpu.load_instruction(9, &jump_to_21);
