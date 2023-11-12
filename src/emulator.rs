@@ -163,6 +163,8 @@ impl Cpu {
             12 => InstSet::logical_add_ri(self),
             13 => InstSet::sub_rd(self),
             14 => InstSet::sub_ri(self),
+            15 => InstSet::multiply_rd(self),
+            16 => InstSet::multiply_ri(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -281,6 +283,17 @@ impl InstSet {
             y if y < 0 => x.wrapping_add(y as u8) as u8,
                      _ => x.wrapping_sub(y as u8) as u8
         })
+    }
+
+    fn multiply_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_mul(y))
+    }
+
+    fn multiply_ri(cpu:Cpu) -> UnknownCpu {
+        if cpu.current_instruction().i_y() < 0 {
+            panic!("Don't know how to handle negative multiply right now")
+        }
+        InstSet::apply_ri_function(cpu, |x, y| x.wrapping_mul(y as u8))
     }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
@@ -1404,7 +1417,7 @@ mod tests {
     #[test]
     fn test_multipy() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(11);
+        let mut instruction = Instruction::from_opcode(15);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.r_y_set(7);
@@ -1421,7 +1434,7 @@ mod tests {
     #[test]
     fn test_multiply_multiple() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(11);
+        let mut instruction = Instruction::from_opcode(15);
         for i in 0..100 {
             instruction.r_dest_set(5);
             instruction.r_x_set(6);
@@ -1433,14 +1446,14 @@ mod tests {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
             };
-            assert_eq!((i*(i+13)) & 0xFF, cpu.read(5));
+            assert_eq!(i.wrapping_mul(i+13) & 0xFF, cpu.read(5));
         }
     }
 
     #[test]
     fn test_multiply_with_overflow() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(11);
+        let mut instruction = Instruction::from_opcode(15);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.r_y_set(7);
@@ -1458,13 +1471,12 @@ mod tests {
     #[test]
     fn test_multply_ri() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(12);
+        let mut instruction = Instruction::from_opcode(16);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
-        instruction.i_y_set(1);
+        instruction.i_y_set(6);
         cpu.load_instruction(1, &instruction);
-        cpu.write(6, 0x0F);
-        cpu.write(7, 1);
+        cpu.write(6, 0x7);
         cpu = match cpu.clock() {
             UnknownCpu::Ok(ok) => ok,
             UnknownCpu::Inter(_) => panic!()
@@ -1477,7 +1489,7 @@ mod tests {
     #[test]
     fn test_mutiply_multiple_ri() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(12);
+        let mut instruction = Instruction::from_opcode(16);
         for i in 0..100 {
             instruction.r_dest_set(5);
             instruction.r_x_set(6);
@@ -1488,20 +1500,20 @@ mod tests {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
             };
-            assert_eq!((i*(i+13)) & 0xFF, cpu.read(5));
+            let y = i + 13;
+            assert_eq!(i.wrapping_mul(i+13) & 0xFF, cpu.read(5), "{i} * {y} isn't correct");
         }
     }
 
     #[test]
     fn test_multiply_with_overflow_ri() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(12);
+        let mut instruction = Instruction::from_opcode(16);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
-        instruction.i_y_set(2);
+        instruction.i_y_set(0xF0);
         cpu.load_instruction(1, &instruction);
         cpu.write(6, 0x0F);
-        cpu.write(7, 0xF0);
         //TODO ADD check for overflow flag
         cpu = match cpu.clock() {
             UnknownCpu::Ok(ok) => ok,
