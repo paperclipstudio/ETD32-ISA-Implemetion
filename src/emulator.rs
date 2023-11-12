@@ -159,8 +159,8 @@ impl Cpu {
             8 => InstSet::logical_xor_rd(self),
             9 => InstSet::logical_xor_ri(self),
             10 => InstSet::logical_not_rd(self),
-            //11 => InstSet::logical_add_ri(self),
-            //12 => InstSet::logical_add_ri(self),
+            11 => InstSet::logical_add_rd(self),
+            12 => InstSet::logical_add_ri(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -203,15 +203,16 @@ impl InstSet {
             let instruction = cpu.current_instruction();
             let x = cpu.read(instruction.r_x());
             let y = instruction.i_y();
-            if y < 0 { 
-                panic!("What should I do with a negitive y value?");
+            let result = op(x,y);
+            if result > u8::MAX.into() { 
+                panic!("What should I do with a result value too large for target?");
             }
-            if y > i8::MAX.into() { 
-                panic!("What should I do with a y value to large for target?");
+            if result < u8::MIN.into() { 
+                panic!("What should I do with a result value too small for target?");
             }
             cpu.write(
                 instruction.r_dest(),
-                op(x, y)
+                result
                 );
             UnknownCpu::Ok(cpu)
         }
@@ -261,6 +262,13 @@ impl InstSet {
         InstSet::apply_rd_function(cpu, |x, _| !x)
     }
         
+    fn logical_add_ri(cpu:Cpu) -> UnknownCpu {
+         InstSet::apply_ri_function(cpu, |x, y| y.wrapping_add(x as i16) as u8)
+    }
+
+    fn logical_add_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_add(y))
+    }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
         let instruction = cpu.current_instruction();
@@ -1153,14 +1161,14 @@ mod tests {
     }
 
     #[test]
-    fn test_logic_add() {
+    fn test_add() {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(11);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         instruction.r_y_set(7);
         cpu.load_instruction(1, &instruction);
-        cpu.write(6, 0x07);
+        cpu.write(6, 0x0F);
         cpu.write(7, 1);
         cpu = match cpu.clock() {
             UnknownCpu::Ok(ok) => ok,
@@ -1170,7 +1178,7 @@ mod tests {
     }
 
     #[test]
-    fn test_logic_add_multiple() {
+    fn test_add_multiple() {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(11);
         for i in 0..100 {
@@ -1189,7 +1197,7 @@ mod tests {
     }
 
     #[test]
-    fn test_logic_add_with_overflow() {
+    fn test_add_with_overflow() {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(11);
         instruction.r_dest_set(5);
@@ -1204,5 +1212,128 @@ mod tests {
             UnknownCpu::Inter(_) => panic!()
         };
         assert_eq!(0x01, cpu.read(5));
+    }
+
+    #[test]
+    fn test_add_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(1);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x0F);
+        cpu.write(7, 1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x10, cpu.read(5));
+    }
+
+    #[test]
+    fn test_add_ri_negative_i() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(1 | (1 << 11));
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0xF1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0xF0, cpu.read(5));
+    }
+
+    #[test]
+    fn test_add_multiple_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        for i in 0..100 {
+            instruction.r_dest_set(5);
+            instruction.r_x_set(6);
+            cpu.write(6, i);
+            instruction.i_y_set((i+13).into());
+            cpu.load_instruction(1, &instruction);
+            cpu = match cpu.clock() {
+                UnknownCpu::Ok(ok) => ok,
+                UnknownCpu::Inter(_) => panic!()
+            };
+            assert_eq!((2*i+13) & 0xFF, cpu.read(5));
+        }
+    }
+
+    #[test]
+    fn test_add_with_overflow_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(2);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0xFF);
+        cpu.write(7, 2);
+        //TODO ADD check for overflow flag
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x01, cpu.read(5));
+    }
+
+    #[test]
+    fn test_sub_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(13);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0xF4);
+        cpu.write(7, 4);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0xF0, cpu.read(5));
+    }
+
+    #[test]
+    fn test_sub_multiple_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(13);
+        for i in 0..100 {
+            instruction.r_dest_set(5);
+            instruction.r_x_set(6);
+            cpu.write(6, i);
+            instruction.i_y_set(7);
+            cpu.write(7, i+13);
+            cpu.load_instruction(1, &instruction);
+            cpu = match cpu.clock() {
+                UnknownCpu::Ok(ok) => ok,
+                UnknownCpu::Inter(_) => panic!()
+            };
+            assert_eq!((2*i+13) & 0xFF, cpu.read(5));
+        }
+    }
+
+    #[test]
+    fn test_sub_with_underflow_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(13);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        cpu.write(6, 0x00);
+        instruction.i_y_set(2);
+        cpu.write(7, 2);
+        cpu.load_instruction(1, &instruction);
+        //TODO ADD check for overflow flag
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0xFE, cpu.read(5));
     }
 }   

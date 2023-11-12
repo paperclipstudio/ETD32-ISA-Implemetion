@@ -1,5 +1,7 @@
 #[allow(unused_imports)]
 use rand::Rng;
+
+pub const NEGITIVE_BIT: u32 = 1 << 21;
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
     pub carry: bool,
@@ -209,7 +211,7 @@ impl Instruction {
     pub fn i_set(&mut self, mut value: i32) {
         self.operands = 0;
         if value > 0 {
-            self.operands |= 1 << 21;
+            self.operands |= NEGITIVE_BIT;
         } 
         // maybe throw error here if value is too large?
         value &= 0x1FFFFF;
