@@ -161,6 +161,7 @@ impl Cpu {
             10 => InstSet::logical_not_rd(self),
             11 => InstSet::logical_add_rd(self),
             12 => InstSet::logical_add_ri(self),
+            13 => InstSet::sub_rd(self),
             17 => InstSet::load_8_bo(self),
             18 => InstSet::load_8_bi(self),
             19 => InstSet::load_16_bo(self),
@@ -268,6 +269,10 @@ impl InstSet {
 
     fn logical_add_rd(cpu:Cpu) -> UnknownCpu {
         InstSet::apply_rd_function(cpu, |x, y| x.wrapping_add(y))
+    }
+
+    fn sub_rd(cpu:Cpu) -> UnknownCpu {
+        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_sub(y))
     }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
@@ -1307,15 +1312,15 @@ mod tests {
         for i in 0..100 {
             instruction.r_dest_set(5);
             instruction.r_x_set(6);
-            cpu.write(6, i);
-            instruction.i_y_set(7);
+            cpu.write(6, i*2+26);
+            instruction.r_y_set(7);
             cpu.write(7, i+13);
             cpu.load_instruction(1, &instruction);
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
             };
-            assert_eq!((2*i+13) & 0xFF, cpu.read(5));
+            assert_eq!((i+13) & 0xFF, cpu.read(5));
         }
     }
 
@@ -1326,7 +1331,7 @@ mod tests {
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         cpu.write(6, 0x00);
-        instruction.i_y_set(2);
+        instruction.r_y_set(7);
         cpu.write(7, 2);
         cpu.load_instruction(1, &instruction);
         //TODO ADD check for overflow flag
