@@ -277,7 +277,11 @@ impl InstSet {
     }
 
     fn sub_ri(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_sub(y))
+        InstSet::apply_ri_function(cpu, |x, y| match y {
+            y if y < 0 => x.wrapping_add(y as u8) as u8,
+                     _ => x.wrapping_sub(y as u8) as u8
+        })
+        //
     }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
@@ -1371,7 +1375,7 @@ mod tests {
             instruction.r_dest_set(5);
             instruction.r_x_set(6);
             cpu.write(6, i*2+26);
-            instruction.r_y_set(i+13);
+            instruction.i_y_set((i+13).into());
             cpu.load_instruction(1, &instruction);
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
@@ -1384,7 +1388,7 @@ mod tests {
     #[test]
     fn test_sub_with_underflow_ri() {
         let mut cpu = Cpu::new_blank();
-        let mut instruction = Instruction::from_opcode(13);
+        let mut instruction = Instruction::from_opcode(14);
         instruction.r_dest_set(5);
         instruction.r_x_set(6);
         cpu.write(6, 0x00);
