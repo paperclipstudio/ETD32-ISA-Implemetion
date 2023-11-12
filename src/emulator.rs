@@ -281,7 +281,6 @@ impl InstSet {
             y if y < 0 => x.wrapping_add(y as u8) as u8,
                      _ => x.wrapping_sub(y as u8) as u8
         })
-        //
     }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
@@ -1402,4 +1401,112 @@ mod tests {
         assert_eq!(0xFE, cpu.read(5));
     }
     //TODO Add multiply tests
+    #[test]
+    fn test_multipy() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 6);
+        cpu.write(7, 7);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(6*7, cpu.read(5));
+    }
+
+    #[test]
+    fn test_multiply_multiple() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        for i in 0..100 {
+            instruction.r_dest_set(5);
+            instruction.r_x_set(6);
+            instruction.r_y_set(7);
+            cpu.load_instruction(1, &instruction);
+            cpu.write(6, i);
+            cpu.write(7, i+13);
+            cpu = match cpu.clock() {
+                UnknownCpu::Ok(ok) => ok,
+                UnknownCpu::Inter(_) => panic!()
+            };
+            assert_eq!((i*(i+13)) & 0xFF, cpu.read(5));
+        }
+    }
+
+    #[test]
+    fn test_multiply_with_overflow() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.r_y_set(7);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0xF0);
+        cpu.write(7, 0x0F);
+        //TODO ADD check for overflow flag
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x10, cpu.read(5));
+    }
+
+    #[test]
+    fn test_multply_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(1);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x0F);
+        cpu.write(7, 1);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(6*7, cpu.read(5));
+    }
+
+    //TODO What happens when we multply with a negative number?
+
+    #[test]
+    fn test_mutiply_multiple_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        for i in 0..100 {
+            instruction.r_dest_set(5);
+            instruction.r_x_set(6);
+            cpu.write(6, i);
+            instruction.i_y_set((i+13).into());
+            cpu.load_instruction(1, &instruction);
+            cpu = match cpu.clock() {
+                UnknownCpu::Ok(ok) => ok,
+                UnknownCpu::Inter(_) => panic!()
+            };
+            assert_eq!((i*(i+13)) & 0xFF, cpu.read(5));
+        }
+    }
+
+    #[test]
+    fn test_multiply_with_overflow_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        instruction.r_dest_set(5);
+        instruction.r_x_set(6);
+        instruction.i_y_set(2);
+        cpu.load_instruction(1, &instruction);
+        cpu.write(6, 0x0F);
+        cpu.write(7, 0xF0);
+        //TODO ADD check for overflow flag
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(0x10, cpu.read(5));
+    }
 }   
