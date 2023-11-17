@@ -216,8 +216,11 @@ impl InstSet {
             let y = cpu.read(instruction.r_y());
             println!("{x}, {y}");
             let (result, carry) = op(x,y);
-            println!("{result}, {carry}");
             cpu.flags.carry = carry;
+            cpu.flags.greater = result > 0;
+            // cpu.flags.less = result < 0;
+            cpu.flags.zero = result == 0;
+            println!("{result}, {result}");
             cpu.write(
                 instruction.r_dest(),
                 result
@@ -235,6 +238,10 @@ impl InstSet {
             let (result, carry) = op(x,y);
             println!("{result}, {carry}");
             cpu.flags.carry = carry;
+            cpu.flags.greater = result > 0;
+            //TODO Review the meaning of less than zero, Does the ALU assume signned ints?
+            // cpu.flags.less = result < 0;
+            cpu.flags.zero = result == 0;
             if result > u8::MAX.into() { 
                 panic!("What should I do with a result value too large for target?");
             }
@@ -1619,4 +1626,76 @@ mod tests {
        };
        assert!(!cpu.flags.carry);
     }
+
+    #[test]
+    fn test_greater_flag_set_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x2);
+       instruction.r_y_set(3);
+       cpu.write(3, 0x32);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(cpu.flags.greater);
+    }
+    #[test]
+    fn test_greater_flag_not_set_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x0);
+       instruction.r_y_set(3);
+       cpu.write(3, 0x0);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(!cpu.flags.greater);
+    }
+    /*
+    #[test]
+    fn test_lesser_flag_set_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(13);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x2);
+       instruction.r_y_set(3);
+       cpu.write(3, 0x4);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(cpu.flags.greater);
+    }
+
+    #[test]
+    fn test_lesser_flag_not_set_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x3);
+       instruction.r_y_set(3);
+       cpu.write(3, 0x1);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(!cpu.flags.greater);
+    }
+    */
 }   
