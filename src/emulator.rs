@@ -314,14 +314,14 @@ impl InstSet {
     }
 
     fn multiply_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y|(x.wrapping_mul(y), false))
+        InstSet::apply_rd_function(cpu, |x, y|x.overflowing_mul(y))
     }
 
     fn multiply_ri(cpu:Cpu) -> UnknownCpu {
         if cpu.current_instruction().i_y() < 0 {
             panic!("Don't know how to handle negative multiply right now")
         }
-        InstSet::apply_ri_function(cpu, |x, y|(x.wrapping_mul(y as u8), false))
+        InstSet::apply_ri_function(cpu, |x, y| x.overflowing_mul(y as u8))
     }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
