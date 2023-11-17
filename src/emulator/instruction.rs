@@ -1,6 +1,64 @@
 #[allow(unused_imports)]
 use rand::Rng;
 
+
+// How to check to see if that values are too large for real instruction????
+// As in i_set we check the size of value but this would be harder to do at 
+// initalision of an enum.
+//
+// Like this??
+struct U5 {
+    value:u8
+}
+
+impl U5 {
+    fn new(value:u8) -> Self {
+      U5 {value}
+    }
+
+    fn set(&mut self, value:u8) {
+        self.value = value & 0x1F
+    }
+
+    fn get(&self) -> u8 {
+          self.value
+    }
+}
+
+struct Rd {
+    dest:u8,
+    x:U5,
+    y:u8
+}
+
+struct Bo {
+    target:u8,
+    base:u8,
+    offset:u8,
+}
+
+enum Alt {
+    AddRd(Rd),
+    SubRd(Rd),
+    Jump(u32),
+    Move(Bo),
+}
+
+impl Alt {
+    fn test() { 
+        let t = Alt::AddRd(Rd{
+            dest:2,
+            x:U5::new(5),
+            y:6
+        });
+        match t {
+            Alt::AddRd(mut operands) => operands.x.set(3),
+            _ => (),
+        }
+
+    }
+}
+
 pub const NEGITIVE_BIT: u32 = 1 << 21;
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
