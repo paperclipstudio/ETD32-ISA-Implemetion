@@ -20,7 +20,7 @@ impl U5 {
         self.value = value & 0x1F
     }
 
-    fn get(&self) -> u8 {
+    fn get(self) -> u8 {
           self.value
     }
 }
@@ -46,16 +46,105 @@ enum Alt {
 
 impl Alt {
     fn test() { 
-        let t = Alt::AddRd(Rd{
+        let mut t = Alt::AddRd(Rd{
             dest:2,
             x:U5::new(5),
             y:6
         });
         match t {
-            Alt::AddRd(mut operands) => operands.x.set(3),
+            Alt::AddRd(ref mut operands) => operands.x.set(3),
             _ => (),
-        }
+        };
 
+        let val = match t {
+            Alt::AddRd(operands) => operands.x.get(),
+            _ => 0,
+        };
+        println!("{val}");
+
+    }
+}
+
+/// 
+///
+
+struct U52 {
+    value:u8
+}
+
+impl U52 {
+    fn new(value:u8) -> Self {
+      U52 {value}
+    }
+
+    fn set(&mut self, value:u8) {
+        self.value = value & 0x1F
+    }
+
+    fn get(self) -> u8 {
+          self.value
+    }
+}
+
+struct Rd2 {
+    dest:U52,
+    x:U52,
+    y:U52
+}
+
+struct Bo2 {
+    target:u8,
+    base:u8,
+    offset:u8,
+}
+
+enum Memory {
+    LD8(Bo2)
+}
+
+enum Flow {
+    Jump(u32),
+}
+
+enum Operation {
+    AddRd(Rd),
+    SubRd(Rd),
+}
+
+enum Test {A, B, C}
+
+enum Alt2 {
+    Test(Test),
+    Memory(Memory),
+    Operation(Operation),
+    Flow,
+}
+
+impl Alt2 {
+    fn test() { 
+        let mut t = Alt2::Operation(Operation::AddRd(Rd{
+            dest:2,
+            x:U5::new(5),
+            y:6
+        }));
+        match t {
+            Alt2::Operation(ref mut oper) => match oper {
+                Operation::AddRd(ref mut rd) => rd.x.set(5),
+                _ => (),
+            },
+            _ => (),
+
+        };
+
+        let val = match t {
+            Alt2::Operation(oper) => match oper {
+                Operation::AddRd(rd) => rd.x.get(),
+                _ => 0,
+            },
+            _ => 0,
+        };
+
+        let r = Alt2::Test(Test::A);
     }
 }
 
