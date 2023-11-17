@@ -14,11 +14,29 @@ pub enum UnknownCpu {
     Ok(Cpu)
 }
 
+pub struct Flags {
+    carry: bool,
+    greater: bool,
+    zero: bool,
+    less: bool,
+}
+
+impl Flags {
+    fn new() -> Flags {
+        Flags {
+            carry: false,
+            greater: false,
+            zero: false,
+            less: false,
+        }
+    }
+}
+
 pub struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
     program_counter: u8,
-    flag_register: [u8; 4],
+    flags: Flags,
     pub memory: Box<dyn Memory>,
 }
 
@@ -1498,7 +1516,7 @@ mod tests {
         }
     }
 
-    #[test]
+#[test]
     fn test_multiply_with_overflow_ri() {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(16);
@@ -1513,5 +1531,17 @@ mod tests {
             UnknownCpu::Inter(_) => panic!()
         };
         assert_eq!(0x10, cpu.read(5));
+    }
+
+    #[test]
+    fn test_carry_flag_set() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0xFF);
+       instruction.i_set(2);
+       assert!(cpu.flags.carry);
     }
 }   
