@@ -159,6 +159,7 @@ impl Cpu {
     }
 
     pub fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
+        //TODO Add check for write...
         self.memory.write_u32(location, instruction.encode());
     }
 
@@ -209,23 +210,31 @@ impl Cpu {
 struct InstSet {}
 impl InstSet {
     fn apply_rd_function<F>(mut cpu:Cpu, op:F) -> UnknownCpu 
-        where F: Fn(u8, u8) -> u8 {
+        where F: Fn(u8, u8) -> (u8, bool) {
             let instruction = cpu.current_instruction();
             let x = cpu.read(instruction.r_x());
             let y = cpu.read(instruction.r_y());
+            println!("{x}, {y}");
+            let (result, carry) = op(x,y);
+            println!("{result}, {carry}");
+            cpu.flags.carry = carry;
             cpu.write(
                 instruction.r_dest(),
-                op(x, y)
+                result
                 );
             UnknownCpu::Ok(cpu)
         }
 
     fn apply_ri_function<F>(mut cpu:Cpu, op:F) -> UnknownCpu 
-        where F: Fn(u8, i16) -> u8 {
+        where F: Fn(u8, i16) -> (u8, bool) {
             let instruction = cpu.current_instruction();
             let x = cpu.read(instruction.r_x());
             let y = instruction.i_y();
-            let result = op(x,y);
+            println!("RI: {x}, {y}");
+            println!("{instruction}");
+            let (result, carry) = op(x,y);
+            println!("{result}, {carry}");
+            cpu.flags.carry = carry;
             if result > u8::MAX.into() { 
                 panic!("What should I do with a result value too large for target?");
             }
@@ -241,77 +250,78 @@ impl InstSet {
 
     /// Operations
     fn logical_right_shift_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |value, shift| (value >> shift) & 0xFF)
+        InstSet::apply_rd_function(cpu, |value, shift|((value >> shift) & 0xFF, false))
     }
 
     fn logical_right_shift_ri(cpu:Cpu) -> UnknownCpu {
-         InstSet::apply_ri_function(cpu, |value, shift| (value >> shift) & 0xFF)
+         InstSet::apply_ri_function(cpu, |value, shift|((value >> shift) & 0xFF, false))
     }
 
     fn logical_left_shift_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |value, shift| (value << shift) & 0xFF)
+        InstSet::apply_rd_function(cpu, |value, shift|((value << shift) & 0xFF, false))
     }
 
     fn logical_left_shift_ri(cpu:Cpu) -> UnknownCpu {
-         InstSet::apply_ri_function(cpu, |value, shift| (value << shift) & 0xFF)
+         InstSet::apply_ri_function(cpu, |value, shift|((value << shift) & 0xFF, false))
     }
 
     fn logical_and_ri(cpu:Cpu) -> UnknownCpu {
-         InstSet::apply_ri_function(cpu, |x, y| x & y as u8)
+         InstSet::apply_ri_function(cpu, |x, y|(x & y as u8, false))
     }
 
     fn logical_and_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x & y)
+        InstSet::apply_rd_function(cpu, |x, y|(x & y, false))
     }
 
     fn logical_or_ri(cpu:Cpu) -> UnknownCpu {
-         InstSet::apply_ri_function(cpu, |x, y| x | y as u8)
+         InstSet::apply_ri_function(cpu, |x, y| (x | y as u8, false))
     }
 
     fn logical_or_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x | y)
+        InstSet::apply_rd_function(cpu, |x, y| (x | y, false))
     }
 
     fn logical_xor_ri(cpu:Cpu) -> UnknownCpu {
-         InstSet::apply_ri_function(cpu, |x, y| x ^ y as u8)
+         InstSet::apply_ri_function(cpu, |x, y|(x ^ y as u8, false))
     }
 
     fn logical_xor_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x ^ y)
+        InstSet::apply_rd_function(cpu, |x, y|(x ^ y, false))
     }
 
     fn logical_not_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, _| !x)
+        InstSet::apply_rd_function(cpu, |x, _|(!x, false))
     }
         
     fn logical_add_ri(cpu:Cpu) -> UnknownCpu {
-         InstSet::apply_ri_function(cpu, |x, y| y.wrapping_add(x as i16) as u8)
+         InstSet::apply_ri_function(cpu, |x, y|x.overflowing_add(y as u8))
     }
 
     fn logical_add_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_add(y))
+        InstSet::apply_rd_function(cpu, |x, y|x.overflowing_add(y))
     }
 
     fn sub_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_sub(y))
+        InstSet::apply_rd_function(cpu, |x, y|x.overflowing_sub(y))
     }
 
     fn sub_ri(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_ri_function(cpu, |x, y| match y {
-            y if y < 0 => x.wrapping_add(y as u8) as u8,
-                     _ => x.wrapping_sub(y as u8) as u8
-        })
+        InstSet::apply_ri_function(cpu, 
+                                   |x, y| match y {
+                                       y if y < 0 => x.overflowing_sub(y as u8),
+                                       _ => x.overflowing_sub(y as u8)
+                                   })
     }
 
     fn multiply_rd(cpu:Cpu) -> UnknownCpu {
-        InstSet::apply_rd_function(cpu, |x, y| x.wrapping_mul(y))
+        InstSet::apply_rd_function(cpu, |x, y|(x.wrapping_mul(y), false))
     }
 
     fn multiply_ri(cpu:Cpu) -> UnknownCpu {
         if cpu.current_instruction().i_y() < 0 {
             panic!("Don't know how to handle negative multiply right now")
         }
-        InstSet::apply_ri_function(cpu, |x, y| x.wrapping_mul(y as u8))
+        InstSet::apply_ri_function(cpu, |x, y|(x.wrapping_mul(y as u8), false))
     }
     ///Memory
     fn load_8_bi(mut cpu: Cpu) -> UnknownCpu {
@@ -1541,14 +1551,72 @@ mod tests {
     }
 
     #[test]
-    fn test_carry_flag_set() {
+    fn test_carry_flag_set_ri() {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(12);
         
        instruction.r_dest_set(1);
        instruction.r_x_set(2);
        cpu.write(2, 0xFF);
-       instruction.i_set(2);
+       instruction.i_y_set(42);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
        assert!(cpu.flags.carry);
+    }
+
+    #[test]
+    fn test_carry_flag_not_set_ri() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x4);
+       instruction.i_set(2);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(!cpu.flags.carry);
+    }
+
+    #[test]
+    fn test_carry_flag_set_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(12);
+
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x4);
+       instruction.r_y_set(3);
+       cpu.write(2, 0xFF);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(cpu.flags.carry);
+    }
+
+    #[test]
+    fn test_carry_flag_not_set_rd() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        
+       instruction.r_dest_set(1);
+       instruction.r_x_set(2);
+       cpu.write(2, 0x2);
+       instruction.r_y_set(3);
+       cpu.write(2, 0x32);
+       cpu.load_instruction(1, &instruction);
+       cpu = match cpu.clock() {
+           UnknownCpu::Ok(ok) => ok,
+           UnknownCpu::Inter(_) => panic!()
+       };
+       assert!(!cpu.flags.carry);
     }
 }   
