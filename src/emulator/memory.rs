@@ -14,6 +14,22 @@ pub struct SimpleMemory {
 pub trait Memory {
     fn read(&self, address: u8) -> Option<u8>;
     fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str>;
+
+    fn read_u32(&self, address: u8) -> Option<u32> {
+        Some(
+             self.read(address    )? as u32        |
+            (self.read(address + 1)? as u32) <<  8 |
+            (self.read(address + 2)? as u32) << 16 |
+            (self.read(address + 3)? as u32) << 24)
+    }
+
+    fn write_u32(&mut self, address: u8, value:u32) -> Result<(), &'static str> {
+        self.write(address    ,  (value        & 0xFF) as u8)?;
+        self.write(address + 1, ((value >> 8)  & 0xFF) as u8)?;
+        self.write(address + 2, ((value >> 16) & 0xFF) as u8)?;
+        self.write(address + 3, ((value >> 24) & 0xFF) as u8)?;
+        Ok(())
+    }
 }
 
 impl SimpleMemory {
@@ -39,6 +55,7 @@ impl Memory for SimpleMemory {
            None 
         }
     }
+
 
     fn write(&mut self, address:u8, value: u8) -> Result<(), &'static str> {
         if address >= self.data.len() as u8 {

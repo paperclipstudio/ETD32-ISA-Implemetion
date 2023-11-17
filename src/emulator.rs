@@ -130,18 +130,11 @@ impl Cpu {
     }
 
     fn instruction_at(&self, i:u8) -> Instruction {
-        Instruction::decode (
-             self.read(i    ) as u32        |
-            (self.read(i + 1) as u32) <<  8 |
-            (self.read(i + 2) as u32) << 16 |
-            (self.read(i + 3) as u32) << 24 )
+        Instruction::decode(self.memory.read_u32(i).unwrap())
     }
 
     pub fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
-        self.write(location    , (instruction.encode()         & 0xFF) as u8);
-        self.write(location + 1, ((instruction.encode() >> 8)  & 0xFF) as u8);
-        self.write(location + 2, ((instruction.encode() >> 16) & 0xFF) as u8);
-        self.write(location + 3, ((instruction.encode() >> 24) & 0xFF) as u8);
+        self.memory.write_u32(location, instruction.encode());
     }
 
     /// Simulates a rising edge on the clock 
