@@ -32,6 +32,16 @@ impl Flags {
     }
 }
 
+impl fmt::Debug for Flags {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(fmt, "Carry: {}", self.carry)?;
+        writeln!(fmt, "Greater: {}", self.greater)?;
+        writeln!(fmt, "Zero: {}", self.zero)?;
+        writeln!(fmt, "Less: {}", self.less)?;
+        Ok(())
+    }
+}
+
 pub struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
@@ -43,29 +53,28 @@ pub struct Cpu {
 impl fmt::Display for Cpu {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(fmt, "General {:#?}", self.general_purpose).ok();
-        writeln!(fmt, "StackPointer {:#?}", self.stack_pointer).ok();
-        writeln!(fmt, "Program Counter {:#?}", self.program_counter).ok();
-        writeln!(fmt, "Flag Register {:#?}", self.flag_register).ok();
+        writeln!(fmt, "General {:#?}", self.general_purpose)?;
+        writeln!(fmt, "StackPointer {:#?}", self.stack_pointer)?;
+        writeln!(fmt, "Program Counter {:#?}", self.program_counter)?;
+        writeln!(fmt, "Flag Register {:#?}", self.flags)?;
 
         let mut i = 1;
         while i < self.general_purpose.len() as u8 {
             if i == self.program_counter {
-                write!(fmt, ">>>").ok();
+                write!(fmt, ">>>")?;
             } else {
-                write!(fmt, "   ").ok();
+                write!(fmt, "   ")?;
             }
-            writeln!(fmt, "{}", self.instruction_at(i)).ok();
+            writeln!(fmt, "{}", self.instruction_at(i))?;
             i += 4
         }
 
         for i in 0..32 {
             if i % 4 == 1 {
-                write!(fmt, "\n|{:3}|", i).ok();
+                write!(fmt, "\n|{:3}|", i)?;
             };
-            write!(fmt, "{:X},", self.read(i)).ok();
+            write!(fmt, "{:X},", self.read(i))?;
         }
-
         Ok(())
     }
 }
@@ -107,12 +116,10 @@ impl Cpu {
             general_purpose: [0;29],
             stack_pointer: 0,
             program_counter: 1,
-            flag_register: [0;4],
+            flags: Flags::new(),
             memory: Box::new(SimpleMemory::new())
         };
         cpu.general_purpose.try_fill(&mut rng)
-            .expect("Failed to create random values on Cpu creation");
-        cpu.flag_register.try_fill(&mut rng)
             .expect("Failed to create random values on Cpu creation");
         cpu
     }
@@ -122,7 +129,7 @@ impl Cpu {
             general_purpose: [0;29],
             stack_pointer: 0,
             program_counter: 1,
-            flag_register: [0;4],
+            flags: Flags::new(),
             memory: Box::new(SimpleMemory::new_blank()),
         }
     }
