@@ -1789,7 +1789,8 @@ mod tests {
                UnknownCpu::Inter(ok) => break ok
            };
        };
-       assert_eq!(cpu.program_counter, 2);
+       assert_ne!(cpu.program_counter, 20, "Program jumped even though last result wasn't Zero");
+       assert_eq!(cpu.program_counter, 8, "Program didn't jump expected location");
         
     }
 }   
