@@ -15,7 +15,6 @@ pub struct Instruction {
 impl std::fmt::Display for Instruction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Flags
-
         write!(fmt, "|{}", if self.carry {"C"} else {"-"}).ok();
         write!(fmt, "{}", if self.less_than_zero {"N"} else {"-"}).ok();
         write!(fmt, "{}", if self.equal_to_zero {"Z"} else {"-"}).ok();
@@ -24,6 +23,7 @@ impl std::fmt::Display for Instruction {
         // Opcode
         let opcode: String = format!("{}", self.opcode);
         write!(fmt, "|{:20}|", match self.opcode {
+            11 => "Addition RD",
             17 => "Load from Mem BO",
             29 => "Jump offset",
             30 => "Jump to Rd",
@@ -35,13 +35,13 @@ impl std::fmt::Display for Instruction {
         // Operands
         match (self.opcode, self.opcode % 2 == 0) {
             // Logic Rd
-            (0..=16, false)             => write!(fmt, "{:4}:{:4}:{:4}:{:4}|", self.r_dest(), self.r_x(), self.r_y(), 0).ok(),
+            (0..=16, false)             => write!(fmt, "{:4}:{:4}:{:4}:    |", self.r_dest(), self.r_x(), self.r_y()).ok(),
             (0..=16, true)              => write!(fmt, "{:4}:{:4}:{:9}|", self.r_dest(), self.r_x(), self.i_y()).ok(),
             (17..=28, false)            => write!(fmt, "{:4}:{:4}:{:9}|", self.r_target(), self.r_base(), self.i_offset()).ok(),
             (17..=28, true)             => write!(fmt, "Memory             |").ok(),
-            (29, _) | (31, _) | (32, _) => write!(fmt, "{:16}|", self.opcode).ok(),
-            (30, _)                     => write!(fmt, "{:16}|", self.r_dest()).ok(),
-            (33..=u8::MAX, _)           => write!(fmt, "{:16}|", self.opcode).ok(),
+            (29, _) | (31, _) | (32, _) => write!(fmt, "{:19}|", self.i()).ok(),
+            (30, _)                     => write!(fmt, "{:19}|", self.r_dest()).ok(),
+            (33..=u8::MAX, _)           => write!(fmt, "{:19}|", self.i()).ok(),
         };
 
 
@@ -62,6 +62,13 @@ impl Instruction {
             opcode,
             operands: 0,
        }
+    }
+
+    pub fn set_all_flags(&mut self, state:bool) {
+            self.carry = state;
+            self.less_than_zero = state;
+            self.equal_to_zero = state;
+            self.greater_than_zero = state;
     }
 
     #[allow(arithmetic_overflow)]

@@ -32,6 +32,16 @@ impl Flags {
     }
 }
 
+impl fmt::Display for Flags {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", if self.carry {"C"} else {"-"})?;
+        write!(fmt, "{}", if self.greater {"G"} else {"-"})?;
+        write!(fmt, "{}", if self.zero {"Z"} else {"-"})?;
+        write!(fmt, "{}", if self.less {"L"} else {"-"})?;
+        Ok(())
+    }
+}
+
 impl fmt::Debug for Flags {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         writeln!(fmt, "Carry: {}", self.carry)?;
@@ -53,22 +63,26 @@ pub struct Cpu {
 impl fmt::Display for Cpu {
 
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(fmt, "General {:#?}", self.general_purpose)?;
         writeln!(fmt, "StackPointer {:#?}", self.stack_pointer)?;
         writeln!(fmt, "Program Counter {:#?}", self.program_counter)?;
-        writeln!(fmt, "Flag Register {:#?}", self.flags)?;
+        writeln!(fmt, "Flag Register {}", self.flags)?;
 
-        let mut i = 1;
-        while i < self.general_purpose.len() as u8 {
+
+        writeln!(fmt, "Current Instructions")?;
+        // Current place in instructions
+        let first = i8::max(0, (self.program_counter as i8) - 2) as u8;
+        for i in first..first + 5 {
+                write!(fmt, "{i:3}||")?;
             if i == self.program_counter {
-                write!(fmt, ">>>")?;
+                write!(fmt, "-->")?;
             } else {
                 write!(fmt, "   ")?;
             }
-            writeln!(fmt, "{}", self.instruction_at(i))?;
-            i += 4
+            writeln!(fmt,"{}", Instruction::decode(self.memory.read_u32(i*4).unwrap()))?
         }
-
+        
+        // Print General Registers
+        writeln!(fmt, "General Registers")?;
         for i in 0..32 {
             if i % 4 == 1 {
                 write!(fmt, "\n|{:3}|", i)?;
@@ -159,13 +173,19 @@ impl Cpu {
     }
 
     pub fn load_instruction(&mut self, location: u8, instruction: &Instruction) {
+            println!("Loading into {}: {}", location, instruction);
         //TODO Add check for write...
-        self.memory.write_u32(location, instruction.encode());
+        match self.memory.write_u32(location, instruction.encode()) {
+            Ok(_) => (),
+            Err(_) => panic!("Instruction failed to be loaded into memory"),
+
+        }
     }
 
     /// Simulates a rising edge on the clock 
     pub fn clock(self) -> UnknownCpu {
         let instruction = self.current_instruction();
+        println!("Running instruction at {}: {instruction}", self.program_counter);
         match instruction.opcode {
             0 => InstSet::logical_left_shift_rd(self),
             1 => InstSet::logical_left_shift_ri(self),
@@ -200,7 +220,11 @@ impl Cpu {
             30 => InstSet::jump_to_rd(self),
             31 => InstSet::jump_to_i(self),
             32 => InstSet::trigger_interupt(self),
-            opcode => panic!("Instruction {opcode} not implemented yet\nInstruction {}\n cpu: {}",instruction, self.show())
+            opcode => {
+                println!("Instruction {opcode} not implemented yet\nInstruction {}\n cpu: {}",instruction, self.show());
+                UnknownCpu::Inter(self)
+            }
+
         }
         //return UnknownCpu::Ok(self)
     }
@@ -504,13 +528,12 @@ impl InstSet {
     }
 
     /// Flow Control
-    fn trigger_interupt(mut cpu: Cpu) -> UnknownCpu {
-        cpu.program_counter += 1;
+    fn trigger_interupt(cpu: Cpu) -> UnknownCpu {
         UnknownCpu::Inter(cpu)
     }
 
     fn jump_offset(mut cpu: Cpu) -> UnknownCpu {
-        // TODO what happens when jump is too large UB?
+        // TODO what happens when jump is too larg?
         cpu.program_counter += cpu
             .current_instruction()
             .i() as u8;
@@ -519,21 +542,21 @@ impl InstSet {
 
     fn jump_to_rd(mut cpu: Cpu) -> UnknownCpu {
         let jump_to = cpu.read(cpu.current_instruction().r_dest());
-        if jump_to > 29 - 4 {
-            UnknownCpu::Inter(cpu)
-        } else {
-            cpu.program_counter = jump_to;
-            UnknownCpu::Ok(cpu)
-        }
+        cpu.program_counter = jump_to;
+        UnknownCpu::Ok(cpu)
     }
 
     fn jump_to_i(mut cpu: Cpu) -> UnknownCpu {
-        let jump_to = cpu.current_instruction().i();
-        if !(0..=29 - 4).contains(&jump_to) {
-            UnknownCpu::Inter(cpu)
-        } else {
-            cpu.program_counter = jump_to as u8;
-            UnknownCpu::Ok(cpu)
+        let jump_to = cpu.current_instruction().i().try_into();
+        match jump_to {
+            Err(_) =>{
+                println!("Can't handle program counter of {}", cpu.current_instruction().i());
+                UnknownCpu::Inter(cpu)
+            },
+            Ok(to) => {
+                cpu.program_counter = to;
+                UnknownCpu::Ok(cpu)
+            }
         }
     }
 }
@@ -682,53 +705,53 @@ mod tests {
     #[test]
     fn test_jump_rd_instruction() {
         let mut cpu = Cpu::new_blank();
+        cpu.program_counter = 0;
         // Fill with Intrupts
         for i in 0..15 {
             let mut intrupt = Instruction::from_opcode(32);
-            intrupt.opcode = 21;
-            cpu.load_instruction(i * 4 + 1, &intrupt);
+            intrupt.i_set(47);
+            cpu.load_instruction(i * 4, &intrupt);
         }
 
-        let mut jump_to_1 = Instruction::from_opcode(30);
-        let mut jump_to_21 = Instruction::from_opcode(30);
-        let mut jump_to_9 = Instruction::from_opcode(30);
+        let mut jump_to_0 = Instruction::from_opcode(30);
+        let mut jump_to_6 = Instruction::from_opcode(30);
+        let mut jump_to_2 = Instruction::from_opcode(30);
         println!("Set 1");
         // We will jump to the value in register 10
-        jump_to_1.r_dest_set(6);
+        jump_to_0.r_dest_set(1);
         // We set the value of register 10 to 1
-        cpu.write(6, 1);
+        cpu.write(1, 0);
         // So this instruction will just to instruction 1
         println!("Set 21");
-        jump_to_21.r_dest_set(7);
-        cpu.write(7, 21);
+        jump_to_6.r_dest_set(2);
+        cpu.write(2, 24);
         println!("Set 9");
-        jump_to_9.r_dest_set(8);
-        cpu.write(8, 9);
+        jump_to_2.r_dest_set(3);
+        cpu.write(3, 8);
 
-        cpu.load_instruction(1, &jump_to_9);
-        cpu.load_instruction(9, &jump_to_21);
-        cpu.load_instruction(21, &jump_to_1);
+        cpu.load_instruction(0, &jump_to_2);
+        cpu.load_instruction(8, &jump_to_6);
+        cpu.load_instruction(24, &jump_to_0);
 
-        println!("{cpu}");
-
-        cpu.program_counter = 1;
-        cpu = match cpu.clock() {
-            UnknownCpu::Inter(cpu) => panic!("Unepected interupt {}", cpu),
-            UnknownCpu::Ok(cpu) => cpu,
-        };
-        assert_eq!(9, cpu.program_counter);
+        println!("Before\n{cpu}");
 
         cpu = match cpu.clock() {
             UnknownCpu::Inter(cpu) => panic!("Unepected interupt {}", cpu),
             UnknownCpu::Ok(cpu) => cpu,
         };
-        assert_eq!(21, cpu.program_counter);
+        assert_eq!(8, cpu.program_counter);
 
         cpu = match cpu.clock() {
             UnknownCpu::Inter(cpu) => panic!("Unepected interupt {}", cpu),
             UnknownCpu::Ok(cpu) => cpu,
         };
-        assert_eq!(1, cpu.program_counter);
+        assert_eq!(24, cpu.program_counter);
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Inter(cpu) => panic!("Unepected interupt {}", cpu),
+            UnknownCpu::Ok(cpu) => cpu,
+        };
+        assert_eq!(0, cpu.program_counter);
     }
 
     #[test]
@@ -1698,4 +1721,50 @@ mod tests {
        assert!(!cpu.flags.greater);
     }
     */
+    #[test]
+    fn test_flag_skips_instuction() {
+        let mut cpu = Cpu::new_blank();
+        cpu.program_counter = 0;
+
+        // 10. Add 1 + 1 
+        let mut i10 = Instruction::from_opcode(11);
+        i10.r_x_set(1);
+        cpu.write(1, 1);
+        i10.r_y_set(2);
+        cpu.write(2, 1);
+        i10.r_dest_set(3);
+        
+        // 20. Jump if Zero to 5 
+        let mut i20 = Instruction::from_opcode(31);
+        i20.i_set(5);
+        i20.set_all_flags(false);
+        i20.equal_to_zero = true;
+        // 30. Interrupt
+        let i30 = Instruction::from_opcode(32);
+        // 40. Nothing
+        // 50. Interrupt
+        let i50 = Instruction::from_opcode(32);
+        // Should be at 30
+        
+       cpu.load_instruction(0, &i10);
+       cpu.load_instruction(4, &i20);
+       cpu.load_instruction(8, &i30);
+       cpu.load_instruction(12, &i50);
+       let mut count = 0;
+       cpu = loop {
+           println!("PC:{}|| {}", cpu.program_counter, cpu.current_instruction());
+           count += 1;
+           if count > 10 {
+               println!("{}", cpu);
+
+               panic!("Program is suck in a loop")
+           };
+           cpu = match cpu.clock() {
+               UnknownCpu::Ok(ok) => ok,
+               UnknownCpu::Inter(ok) => break ok
+           };
+       };
+       assert_eq!(cpu.program_counter, 2);
+        
+    }
 }   
