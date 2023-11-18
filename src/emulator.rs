@@ -249,6 +249,7 @@ impl InstSet {
                 instruction.r_dest(),
                 result
                 );
+            cpu.program_counter += 4;
             UnknownCpu::Ok(cpu)
         }
 
@@ -276,6 +277,7 @@ impl InstSet {
                 instruction.r_dest(),
                 result
                 );
+            cpu.program_counter += 4;
             UnknownCpu::Ok(cpu)
         }
 
@@ -1265,19 +1267,36 @@ mod tests {
     fn test_add_multiple() {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(11);
+        instruction.r_dest_set(1);
+        instruction.r_x_set(2);
+        instruction.r_y_set(3);
+        cpu.load_instruction(0, &instruction);
         for i in 0..100 {
-            instruction.r_dest_set(5);
-            instruction.r_x_set(6);
-            instruction.r_y_set(7);
-            cpu.load_instruction(1, &instruction);
-            cpu.write(6, i);
-            cpu.write(7, i+13);
+            cpu.program_counter = 0;
+            cpu.write(2, i);
+            cpu.write(3, i+13);
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
             };
-            assert_eq!((2*i+13) & 0xFF, cpu.read(5));
+            assert_eq!((2*i+13) & 0xFF, cpu.read(1));
         }
+    }
+
+    #[test]
+    fn test_rd_function_incs_program_counter() {
+        let mut cpu = Cpu::new_blank();
+        let mut instruction = Instruction::from_opcode(11);
+        instruction.r_dest_set(1);
+        instruction.r_x_set(2);
+        instruction.r_y_set(3);
+        cpu.load_instruction(0, &instruction);
+        cpu.program_counter = 0;
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(ok) => ok,
+            UnknownCpu::Inter(_) => panic!()
+        };
+        assert_eq!(4, cpu.program_counter);
     }
 
     #[test]
@@ -1336,11 +1355,12 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(12);
         for i in 0..100 {
+            cpu.program_counter = 0;
             instruction.r_dest_set(5);
             instruction.r_x_set(6);
             cpu.write(6, i);
             instruction.i_y_set((i+13).into());
-            cpu.load_instruction(1, &instruction);
+            cpu.load_instruction(0, &instruction);
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
@@ -1395,6 +1415,7 @@ mod tests {
             instruction.r_y_set(7);
             cpu.write(7, i+13);
             cpu.load_instruction(1, &instruction);
+            cpu.program_counter = 1;
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
@@ -1447,6 +1468,7 @@ mod tests {
             cpu.write(6, i*2+26);
             instruction.i_y_set((i+13).into());
             cpu.load_instruction(1, &instruction);
+            cpu.program_counter = 1;
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
@@ -1494,10 +1516,11 @@ mod tests {
         let mut cpu = Cpu::new_blank();
         let mut instruction = Instruction::from_opcode(15);
         for i in 0..100 {
+            cpu.program_counter = 0;
             instruction.r_dest_set(5);
             instruction.r_x_set(6);
             instruction.r_y_set(7);
-            cpu.load_instruction(1, &instruction);
+            cpu.load_instruction(0, &instruction);
             cpu.write(6, i);
             cpu.write(7, i+13);
             cpu = match cpu.clock() {
@@ -1553,7 +1576,9 @@ mod tests {
             instruction.r_x_set(6);
             cpu.write(6, i);
             instruction.i_y_set((i+13).into());
-            cpu.load_instruction(1, &instruction);
+            cpu.load_instruction(0, &instruction);
+            cpu.program_counter = 0;
+
             cpu = match cpu.clock() {
                 UnknownCpu::Ok(ok) => ok,
                 UnknownCpu::Inter(_) => panic!()
@@ -1736,7 +1761,7 @@ mod tests {
         
         // 20. Jump if Zero to 5 
         let mut i20 = Instruction::from_opcode(31);
-        i20.i_set(5);
+        i20.i_set(20);
         i20.set_all_flags(false);
         i20.equal_to_zero = true;
         // 30. Interrupt
@@ -1749,7 +1774,7 @@ mod tests {
        cpu.load_instruction(0, &i10);
        cpu.load_instruction(4, &i20);
        cpu.load_instruction(8, &i30);
-       cpu.load_instruction(12, &i50);
+       cpu.load_instruction(20, &i50);
        let mut count = 0;
        cpu = loop {
            println!("PC:{}|| {}", cpu.program_counter, cpu.current_instruction());
