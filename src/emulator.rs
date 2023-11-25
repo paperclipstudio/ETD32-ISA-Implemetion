@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 mod instruction;
 mod memory;
+mod flags;
 
 use std::fmt;
 use rand;
 use instruction::Instruction;
 use memory::Memory;
 use memory::SimpleMemory;
+use flags::Flags;
 
 #[must_use]
 pub enum UnknownCpu {
@@ -14,43 +16,6 @@ pub enum UnknownCpu {
     Ok(Cpu)
 }
 
-pub struct Flags {
-    carry: bool,
-    greater: bool,
-    zero: bool,
-    less: bool,
-}
-
-impl Flags {
-    fn new() -> Flags {
-        Flags {
-            carry: false,
-            greater: false,
-            zero: false,
-            less: false,
-        }
-    }
-}
-
-impl fmt::Display for Flags {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}", if self.carry {"C"} else {"-"})?;
-        write!(fmt, "{}", if self.greater {"G"} else {"-"})?;
-        write!(fmt, "{}", if self.zero {"Z"} else {"-"})?;
-        write!(fmt, "{}", if self.less {"L"} else {"-"})?;
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Flags {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(fmt, "Carry: {}", self.carry)?;
-        writeln!(fmt, "Greater: {}", self.greater)?;
-        writeln!(fmt, "Zero: {}", self.zero)?;
-        writeln!(fmt, "Less: {}", self.less)?;
-        Ok(())
-    }
-}
 
 pub struct Cpu {
     general_purpose: [u8;29],
@@ -183,8 +148,18 @@ impl Cpu {
     }
 
     /// Simulates a rising edge on the clock 
-    pub fn clock(self) -> UnknownCpu {
+    pub fn clock(mut self) -> UnknownCpu {
         let instruction = self.current_instruction();
+        // Check flags
+        println!("Cpu flags {}, instruction flags {}", self.flags, instruction.flags);
+        if !Flags::instruction_can_run(&self.flags, &instruction.flags) {
+            println!("Skipping instruction");
+            self.program_counter += 4;
+            return UnknownCpu::Ok(self);
+        } else {
+            println!("Not skipping instruction");
+        }
+
         println!("Running instruction at {}: {instruction}", self.program_counter);
         match instruction.opcode {
             0 => InstSet::logical_left_shift_rd(self),
@@ -1762,8 +1737,8 @@ mod tests {
         // 20. Jump if Zero to 5 
         let mut i20 = Instruction::from_opcode(31);
         i20.i_set(20);
-        i20.set_all_flags(false);
-        i20.equal_to_zero = true;
+        i20.flags.set_all_flags(false);
+        i20.flags.zero = true;
         // 30. Interrupt
         let i30 = Instruction::from_opcode(32);
         // 40. Nothing
@@ -1792,5 +1767,46 @@ mod tests {
        assert_ne!(cpu.program_counter, 20, "Program jumped even though last result wasn't Zero");
        assert_eq!(cpu.program_counter, 8, "Program didn't jump expected location");
         
+    }
+
+    #[test]
+    fn test_flag_zero_gets_set() {
+        let mut cpu = Cpu::new_blank();
+        cpu.program_counter = 0;
+
+        // 10. Add 0 + 0
+        let mut i10 = Instruction::from_opcode(11);
+        i10.r_x_set(1);
+        i10.r_y_set(2);
+        i10.r_dest_set(3);
+        cpu.write(1, 0);
+        cpu.write(2, 0);
+        cpu.load_instruction(0, &i10);
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(cpu) => cpu,
+            UnknownCpu::Inter(_) => panic!(),
+        };
+        assert!(cpu.flags.zero);
+    }
+
+    #[test]
+    fn test_flag_zero_does_not_gets_set() {
+        let mut cpu = Cpu::new_blank();
+        cpu.program_counter = 0;
+
+        // 10. Add 1 + 1
+        let mut i10 = Instruction::from_opcode(11);
+        i10.r_x_set(1);
+        i10.r_y_set(2);
+        i10.r_dest_set(3);
+        cpu.load_instruction(0, &i10);
+        cpu.write(1, 1);
+        cpu.write(2, 1);
+
+        cpu = match cpu.clock() {
+            UnknownCpu::Ok(cpu) => cpu,
+            UnknownCpu::Inter(_) => panic!(),
+        };
+        assert!(!cpu.flags.zero);
     }
 }   

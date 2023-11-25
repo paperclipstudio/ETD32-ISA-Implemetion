@@ -1,13 +1,11 @@
 #[allow(unused_imports)]
 use rand::Rng;
+use crate::emulator::flags::Flags;
 
 pub const NEGITIVE_BIT: u32 = 1 << 21;
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
-    pub carry: bool,
-    pub less_than_zero: bool,
-    pub equal_to_zero: bool,
-    pub greater_than_zero: bool,
+    pub flags: Flags,
     pub opcode: u8,
     operands: u32
 }
@@ -15,10 +13,10 @@ pub struct Instruction {
 impl std::fmt::Display for Instruction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Flags
-        write!(fmt, "|{}", if self.carry {"C"} else {"-"}).ok();
-        write!(fmt, "{}", if self.less_than_zero {"N"} else {"-"}).ok();
-        write!(fmt, "{}", if self.equal_to_zero {"Z"} else {"-"}).ok();
-        write!(fmt, "{}", if self.greater_than_zero {"P"} else {"-"}).ok();
+        write!(fmt, "|{}", if self.flags.carry {"C"} else {"-"}).ok();
+        write!(fmt, "{}", if self.flags.less {"N"} else {"-"}).ok();
+        write!(fmt, "{}", if self.flags.zero {"Z"} else {"-"}).ok();
+        write!(fmt, "{}", if self.flags.greater {"P"} else {"-"}).ok();
 
         // Opcode
         let opcode: String = format!("{}", self.opcode);
@@ -55,21 +53,12 @@ impl std::fmt::Display for Instruction {
 impl Instruction {
     pub fn from_opcode(opcode: u8) -> Self {
        Instruction {
-            carry: false,
-            less_than_zero: false,
-            equal_to_zero: false,
-            greater_than_zero: false,
+           flags: Flags::new(),
             opcode,
             operands: 0,
        }
     }
 
-    pub fn set_all_flags(&mut self, state:bool) {
-            self.carry = state;
-            self.less_than_zero = state;
-            self.equal_to_zero = state;
-            self.greater_than_zero = state;
-    }
 
     #[allow(arithmetic_overflow)]
     pub fn encode(&self) -> u32 {
@@ -80,20 +69,23 @@ impl Instruction {
         if self.operands > 0x3FFFFF {
             panic!("operands too large {:X}", self.operands);
         };
-        (if self.carry             {(1_u32) << 31} else{ 0 }) |
-        (if self.less_than_zero    {1<< 30} else{ 0 }) as u32 |
-        (if self.equal_to_zero     {1<< 29} else{ 0 }) as u32 |
-        (if self.greater_than_zero {1<< 28} else{ 0 }) as u32 |
+        (if self.flags.carry             {(1_u32) << 31} else{ 0 }) |
+        (if self.flags.less    {1<< 30} else{ 0 }) as u32 |
+        (if self.flags.zero     {1<< 29} else{ 0 }) as u32 |
+        (if self.flags.greater {1<< 28} else{ 0 }) as u32 |
         (self.opcode as u32)            << 22 |
         self.operands
     }
 
     pub fn decode(value: u32) -> Self {
-        Instruction {
+        let flags = Flags {
             carry:             value >> 31 == 1,
-            less_than_zero:   (value >> 30) & 1 == 1,
-            equal_to_zero:    (value >> 29) & 1 == 1,
-            greater_than_zero:(value >> 28) & 1 == 1,
+            less:   (value >> 30) & 1 == 1,
+            zero:    (value >> 29) & 1 == 1,
+            greater:(value >> 28) & 1 == 1,
+        };
+        Instruction {
+            flags,
             opcode:    (value >> 22 & 0x3F) as u8,
             operands:   value       & 0x3FFFFF,
         }
@@ -245,22 +237,22 @@ mod tests {
     fn encode_flags() {
         let mut instruction = Instruction::from_opcode(32);
         instruction.operands = 0xABC;
-        instruction.carry = true;
+        instruction.flags.carry = true;
         let target = 0x8800_0ABC;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
 
-        instruction.less_than_zero = true;
+        instruction.flags.less = true;
         let target = 0xC800_0ABC;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
 
-        instruction.equal_to_zero = true;
+        instruction.flags.zero = true;
         let target = 0xE800_0ABC;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
 
-        instruction.greater_than_zero = true;
+        instruction.flags.greater = true;
         let target = 0xF800_0ABC;
         let result = instruction.encode();
         assert_eq!(target, result, "\nT: {target:08x}\nR: {result:08x}");
@@ -270,22 +262,22 @@ mod tests {
     fn decode_flags() {
         let mut instruction = Instruction::from_opcode(32);
         instruction.operands = 0xABC;
-        instruction.carry = true;
+        instruction.flags.carry = true;
         let mut target = 0x8800_0ABC;
         let mut result = Instruction::decode(target);
         assert_eq!(instruction, result);
 
-        instruction.less_than_zero = true;
+        instruction.flags.less = true;
         target = 0xC800_0ABC;
         result = Instruction::decode(target);
         assert_eq!(instruction, result);
 
-        instruction.equal_to_zero = true;
+        instruction.flags.zero = true;
         target = 0xE800_0ABC;
         result = Instruction::decode(target);
         assert_eq!(instruction, result);
 
-        instruction.greater_than_zero = true;
+        instruction.flags.greater = true;
         target = 0xF800_0ABC;
         result = Instruction::decode(target);
         assert_eq!(instruction, result);
