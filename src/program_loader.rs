@@ -3,7 +3,7 @@ use crate::emulator::Instruction;
 use rand;
 use rand::prelude::*;
 
-fn parse_machine_code(program:String) -> Vec<Instruction> {
+pub fn parse_machine_code(program:String) -> Vec<Instruction> {
     let result =
         program
         .lines()
@@ -177,13 +177,6 @@ mod test {
         for (i, j) in all_instructions.iter().zip(decoded) {
             assert_eq!(*i, j, "\n{}\n{}", i, j);
         }
-
-/*
-# 
-0001-111111-00000 00011 00010 0001100 # 28 - 31
-# End
-0000-100000-00000 00000 00000 0000000 # 32 - 35
-*/
         return ();
     }
 

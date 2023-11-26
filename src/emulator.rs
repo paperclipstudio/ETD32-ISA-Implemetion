@@ -20,7 +20,7 @@ pub enum UnknownCpu {
 pub struct Cpu {
     general_purpose: [u8;29],
     stack_pointer: u8,
-    program_counter: u8,
+    pub program_counter: u8,
     flags: Flags,
     pub memory: Box<dyn Memory>,
 }
@@ -35,15 +35,16 @@ impl fmt::Display for Cpu {
 
         writeln!(fmt, "Current Instructions")?;
         // Current place in instructions
-        let first = i8::max(0, (self.program_counter as i8) - 2) as u8;
-        for i in first..first + 5 {
-                write!(fmt, "{i:3}||")?;
-            if i == self.program_counter {
+        let first = i8::max(0, (self.program_counter as i8)/4 - 4) as u8;
+        for i in first..first + 9{
+            let pc = i * 4;
+                write!(fmt, "{pc:3}||")?;
+            if pc == self.program_counter {
                 write!(fmt, "-->")?;
             } else {
                 write!(fmt, "   ")?;
             }
-            writeln!(fmt,"{}", Instruction::decode(self.memory.read_u32(i*4).unwrap()))?
+            writeln!(fmt,"{}", self.instruction_at(pc))?
         }
         
         // Print General Registers
@@ -151,7 +152,7 @@ impl Cpu {
     pub fn clock(mut self) -> UnknownCpu {
         let instruction = self.current_instruction();
         // Check flags
-        println!("Cpu flags {}, instruction flags {}", self.flags, instruction.flags);
+        //println!("Cpu flags {}, instruction flags {}", self.flags, instruction.flags);
         if !Flags::instruction_can_run(&self.flags, &instruction.flags) {
             println!("Skipping instruction");
             self.program_counter += 4;
@@ -341,6 +342,7 @@ impl InstSet {
             Ok(()) => UnknownCpu::Ok(cpu),
             Err(msg) => {
                 println!("{msg}"); 
+                cpu.program_counter += 4;
                 return UnknownCpu::Inter(cpu);
             }
         }
@@ -354,6 +356,7 @@ impl InstSet {
             Ok(()) => UnknownCpu::Ok(cpu),
             Err(msg) => {
                 println!("{msg}"); 
+                cpu.program_counter += 4;
                 return UnknownCpu::Inter(cpu);
             }
         }
@@ -372,6 +375,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         return UnknownCpu::Ok(cpu)
     }
 
@@ -387,6 +391,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         return UnknownCpu::Ok(cpu)
     }
 
@@ -402,6 +407,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -416,6 +422,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -428,6 +435,7 @@ impl InstSet {
             Ok(()) => (),
             Err(_msg) => return UnknownCpu::Inter(cpu),
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -441,6 +449,7 @@ impl InstSet {
             Ok(()) => (),
             Err(_msg) => return UnknownCpu::Inter(cpu),
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -456,6 +465,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -471,6 +481,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -486,6 +497,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -501,6 +513,7 @@ impl InstSet {
                 Err(_msg) => return UnknownCpu::Inter(cpu),
             }
         }
+        cpu.program_counter += 4;
         UnknownCpu::Ok(cpu)
     }
 
@@ -925,6 +938,7 @@ mod tests {
                 cpu.write(6, address);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
@@ -952,6 +966,7 @@ mod tests {
                 cpu.write(6, 0);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
@@ -980,6 +995,7 @@ mod tests {
                 cpu.write(7, 0);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
@@ -1008,6 +1024,7 @@ mod tests {
                 cpu.write(7, 0);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
@@ -1039,6 +1056,7 @@ mod tests {
                 cpu.write(9, 0);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
@@ -1071,6 +1089,7 @@ mod tests {
                 cpu.write(8, 0);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
@@ -1103,6 +1122,7 @@ mod tests {
                 cpu.write(10, 0);
 
                 cpu.load_instruction(1, &instruction);
+                cpu.program_counter = 1;
                 cpu = match cpu.clock() {
                     UnknownCpu::Ok(cpu) => cpu,
                     UnknownCpu::Inter(cpu) => panic!("Unexpected intrrupt {}", cpu),
