@@ -1,11 +1,11 @@
 #![allow(dead_code)]
-mod instruction;
+pub mod instruction;
 mod memory;
 mod flags;
 
 use std::fmt;
 use rand;
-use instruction::Instruction;
+pub use instruction::Instruction;
 use memory::Memory;
 use memory::SimpleMemory;
 use flags::Flags;

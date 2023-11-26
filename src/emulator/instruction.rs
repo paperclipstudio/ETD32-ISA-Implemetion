@@ -22,7 +22,9 @@ impl std::fmt::Display for Instruction {
         let opcode: String = format!("{}", self.opcode);
         write!(fmt, "|{:20}|", match self.opcode {
             11 => "Addition RD",
+            12 => "Addition RI",
             17 => "Load from Mem BO",
+            23 => "Store 8bits",
             29 => "Jump offset",
             30 => "Jump to Rd",
             31 => "Jump to I",
